@@ -95,6 +95,52 @@ def iframe_token_invalid() -> HubError:
     )
 
 
+def validation_failed(detail: str, extensions: dict[str, Any] | None = None) -> HubError:
+    return HubError(
+        slug="validation-failed",
+        status=422,
+        title="Validation failed",
+        detail=detail,
+        extensions=extensions,
+    )
+
+
+def payload_too_large(detail: str) -> HubError:
+    return HubError(
+        slug="payload-too-large",
+        status=422,
+        title="Payload too large",
+        detail=detail,
+    )
+
+
+def storage_unavailable() -> HubError:
+    return HubError(
+        slug="storage-unavailable",
+        status=503,
+        title="Storage temporarily unavailable",
+        detail="Object storage is unavailable. Retry with the same Idempotency-Key.",
+    )
+
+
+def idempotency_key_missing() -> HubError:
+    return HubError(
+        slug="idempotency-key-missing",
+        status=422,
+        title="Idempotency-Key header required",
+        detail="POST /v1/reports requires an Idempotency-Key header containing a UUID.",
+    )
+
+
+def idempotency_key_invalid() -> HubError:
+    return HubError(
+        slug="idempotency-key-invalid",
+        status=422,
+        title="Idempotency-Key must be a UUID",
+        detail="The Idempotency-Key header must be a valid UUID (RFC 4122).",
+    )
+
+
 def rate_limit_exceeded(retry_after_seconds: int) -> HubError:
     return HubError(
         slug="rate-limit-exceeded",
