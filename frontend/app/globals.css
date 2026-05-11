@@ -1,0 +1,26 @@
+/* Hub-specific overrides on top of the Cohere v.alpha tokens.
+   Order matters: tokens.css must be imported before this in layout.tsx
+   so the @import below resolves the cascade correctly.
+
+   Hub is light-mode only in v1 (DESIGN.md "Dark Mode Policy"). */
+
+html, body {
+  background: var(--bg-canvas);
+  color: var(--fg-1);
+  min-height: 100%;
+}
+
+/* Inputs inherit Inter but browsers don't always inherit by default. */
+input, button, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Hub focus posture: --color-form-focus (purple) per DESIGN.md S1 table. */
+:where(input, button, a):focus-visible {
+  outline: 2px solid var(--color-form-focus);
+  outline-offset: 2px;
+}
+
+/* Disable native iOS form zoom-on-focus by keeping inputs ≥16px (S1 spec). */
