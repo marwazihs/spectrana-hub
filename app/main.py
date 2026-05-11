@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 
 from app.config import settings
+from app.errors import HubError, hub_error_handler
 
 
 logging.basicConfig(
@@ -32,6 +33,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.add_exception_handler(HubError, hub_error_handler)  # type: ignore[arg-type]
 
 
 @app.get("/healthz")
