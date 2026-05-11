@@ -10,7 +10,7 @@ from app.config import settings
 from app.errors import HubError, hub_error_handler
 from app.jobs.scheduler import start_scheduler
 from app.reports.api import router as reports_router
-from app.reports.render import iframe_router
+from app.reports.render import iframe_router, viewer_router
 
 
 logging.basicConfig(
@@ -44,6 +44,7 @@ app = FastAPI(
 app.add_exception_handler(HubError, hub_error_handler)  # type: ignore[arg-type]
 app.include_router(reports_router)
 app.include_router(iframe_router)
+app.include_router(viewer_router)
 
 
 @app.get("/healthz")

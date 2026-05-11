@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ brand }} report</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; background: #f7f7f5; color: #1a1a1a; }
+    header, footer { padding: 12px 16px; }
+    header { border-bottom: 1px solid #e5e5e0; }
+    footer { border-top: 1px solid #e5e5e0; font-size: 0.85rem; color: #666; }
+    iframe { width: 100%; border: 0; display: block; background: #fff; }
+    @media (max-width: 640px) {
+      header, footer { padding: 10px 0; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <header data-hub-chrome="top">{{ brand }}</header>
+  <iframe
+    id="hub-report"
+    src="{{ iframe_src }}"
+    title="Report contents"
+    referrerpolicy="no-referrer"
+    sandbox="allow-scripts"
+    style="height: 100vh"
+    loading="eager"></iframe>
+  <footer data-hub-chrome="bottom">Signed in as {{ email }}</footer>
+  <script>
+    (function () {
+      var iframe = document.getElementById('hub-report');
+      window.addEventListener('message', function (ev) {
+        var data = ev && ev.data;
+        if (!data || data.type !== 'hub-resize') return;
+        var h = Math.ceil(Number(data.height) || 0) + 1;
+        if (h > 0) iframe.style.height = h + 'px';
+      });
+    })();
+  </script>
+</body>
+</html>
