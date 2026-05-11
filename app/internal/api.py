@@ -22,7 +22,12 @@ from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.service import consume_magic_link, mint_session
+from app.auth.service import (
+    consume_magic_link,
+    mint_iframe_jwt,
+    mint_session,
+    verify_and_refresh_session,
+)
 from app.config import settings
 from app.db.session import get_session
 from app.errors import HubError, magic_link_expired_or_consumed
@@ -116,4 +121,69 @@ async def consume_magic_link_internal(
         customer_id=auth_session.customer_id,
         email=auth_session.email,
         expires_at=auth_session.expires_at,
+    )
+
+
+# === M6.2: iframe JWT mint =============================================
+
+
+class IframeJwtRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    report_id: UUID
+    session_id: UUID
+
+
+class IframeJwtResponse(BaseModel):
+    token: str
+    ttl_seconds: int
+
+
+def _iframe_unauthorized() -> HubError:
+    """Single failure class for iframe-jwt mint: bad/expired session, missing
+    report, or cross-customer. Next.js maps this to "send the user back to
+    /r/[id] email-entry" — same anti-enum posture as the GET /r/{id} flow."""
+    return HubError(
+        slug="iframe-jwt-unauthorized",
+        status=401,
+        title="Iframe token not authorized",
+        detail="The session does not authorize iframe access for this report.",
+    )
+
+
+@router.post(
+    "/iframe-jwt",
+    response_model=IframeJwtResponse,
+    dependencies=[Depends(require_internal_token)],
+)
+async def mint_iframe_jwt_internal(
+    body: IframeJwtRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> IframeJwtResponse:
+    """Mint a 60-second iframe JWT bound to (report_id, customer_id).
+
+    Next.js calls this server-side every time it renders /r/[id] chrome.
+    The JWT itself is what the browser sees in the iframe `src`; the
+    session_id never leaves the server.
+
+    Verification chain:
+      1. session_id resolves to an unexpired session row → customer_id
+      2. report_id exists and belongs to that customer
+    Any failure → 401 iframe-jwt-unauthorized (no info leak; Next.js renders
+    the email-entry page on this response, matching the M4 anti-enum rule)."""
+    auth_session = await verify_and_refresh_session(session, body.session_id)
+    if auth_session is None:
+        raise _iframe_unauthorized()
+
+    report = await session.get(Report, body.report_id)
+    if report is None or report.customer_id != auth_session.customer_id:
+        raise _iframe_unauthorized()
+
+    await session.commit()  # persist the sliding-window refresh on session row
+
+    token = mint_iframe_jwt(
+        report_id=body.report_id, customer_id=auth_session.customer_id
+    )
+    return IframeJwtResponse(
+        token=token, ttl_seconds=settings.IFRAME_JWT_TTL_SECONDS
     )
