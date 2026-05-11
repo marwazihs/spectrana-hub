@@ -1,0 +1,185 @@
+/* =========================================================================
+   Majeve Design System — colors_and_type.css
+   Tokens + base typography. Imported by every preview/UI-kit page.
+   System code-named "Cohere v.alpha" — restrained enterprise AI surface.
+   ========================================================================= */
+
+/* ---------- Webfonts (Google Fonts substitutes — see README) -------------- */
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  /* ===== Brand & accent ============================================== */
+  --color-primary:        #17171c;   /* near-black — primary CTA, footer */
+  --color-cohere-black:   #000000;   /* announcement bar, brand anchor */
+  --color-ink:            #212121;   /* default body text */
+  --color-deep-green:     #003c33;   /* product hero band */
+  --color-dark-navy:      #071829;   /* solution band */
+
+  /* ===== Surface ===================================================== */
+  --color-canvas:         #ffffff;
+  --color-soft-stone:     #eeece7;   /* product cards, warm placeholders */
+  --color-pale-green:     #edfce9;
+  --color-pale-blue:      #f1f5ff;
+  --color-card-border:    #f2f2f2;
+
+  /* ===== Text & rules ================================================ */
+  --color-muted:          #93939f;
+  --color-slate:          #75758a;
+  --color-body-muted:     #616161;
+  --color-hairline:       #d9d9dd;
+  --color-border-light:   #e5e7eb;
+
+  /* ===== Action / accent ============================================= */
+  --color-action-blue:    #1863dc;
+  --color-focus-blue:     #4c6ee6;
+  --color-coral:          #ff7759;
+  --color-coral-soft:     #ffad9b;
+  --color-form-focus:     #9b60aa;
+  --color-error:          #b30000;
+
+  /* ===== On-color text =============================================== */
+  --color-on-primary:     #ffffff;
+  --color-on-dark:        #ffffff;
+
+  /* ===== Semantic foreground ========================================= */
+  --fg-1: var(--color-ink);            /* default body */
+  --fg-2: var(--color-body-muted);     /* secondary body */
+  --fg-3: var(--color-slate);          /* tertiary / metadata */
+  --fg-4: var(--color-muted);          /* faint / footer links */
+  --fg-on-dark: var(--color-on-dark);
+
+  /* ===== Semantic background ========================================= */
+  --bg-canvas:   var(--color-canvas);
+  --bg-stone:    var(--color-soft-stone);
+  --bg-dark:     var(--color-primary);
+  --bg-green:    var(--color-deep-green);
+  --bg-navy:     var(--color-dark-navy);
+  --bg-pale-g:   var(--color-pale-green);
+  --bg-pale-b:   var(--color-pale-blue);
+
+  /* ===== Borders ===================================================== */
+  --border-hairline:  1px solid var(--color-hairline);
+  --border-light:     1px solid var(--color-border-light);
+  --border-card:      1px solid var(--color-card-border);
+  --border-on-dark:   1px solid rgba(255,255,255,0.14);
+
+  /* ===== Type families =============================================== */
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-ui:      "Inter", "Arial", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "Menlo", monospace;
+
+  /* ===== Type scale (role -> { size / line / tracking }) ============= */
+  --t-hero-size:        96px;  --t-hero-lh:    1;     --t-hero-ls:    -1.92px;
+  --t-product-size:     72px;  --t-product-lh: 1;     --t-product-ls: -1.44px;
+  --t-section-d-size:   60px;  --t-section-d-lh: 1;   --t-section-d-ls: -1.2px;
+  --t-section-h-size:   48px;  --t-section-h-lh: 1.2; --t-section-h-ls: -0.48px;
+  --t-card-size:        32px;  --t-card-lh:    1.2;   --t-card-ls:    -0.32px;
+  --t-feature-size:     24px;  --t-feature-lh: 1.3;   --t-feature-ls:  0;
+  --t-body-l-size:      18px;  --t-body-l-lh:  1.4;   --t-body-l-ls:   0;
+  --t-body-size:        16px;  --t-body-lh:    1.5;   --t-body-ls:     0;
+  --t-button-size:      14px;  --t-button-lh:  1.71;  --t-button-ls:   0;
+  --t-caption-size:     14px;  --t-caption-lh: 1.4;   --t-caption-ls:  0;
+  --t-mono-size:        14px;  --t-mono-lh:    1.4;   --t-mono-ls:     0.28px;
+  --t-micro-size:       12px;  --t-micro-lh:   1.4;   --t-micro-ls:    0;
+
+  /* ===== Spacing (8px base + utility singles) ======================== */
+  --space-xxs:  2px;
+  --space-xs:   6px;
+  --space-sm:   8px;
+  --space-md:   12px;
+  --space-lg:   16px;
+  --space-xl:   24px;
+  --space-2xl:  32px;
+  --space-3xl:  48px;
+  --space-4xl:  64px;
+  --space-section: 80px;
+
+  /* ===== Radii ======================================================= */
+  --radius-xs:   4px;
+  --radius-sm:   8px;
+  --radius-md:   16px;
+  --radius-lg:   22px;
+  --radius-xl:   30px;
+  --radius-pill: 32px;
+  --radius-full: 9999px;
+}
+
+/* ---------- Base reset ---------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg-canvas);
+  color: var(--fg-1);
+  font-family: var(--font-ui);
+  font-size: var(--t-body-size);
+  line-height: var(--t-body-lh);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- Semantic type roles (use these in HTML) ---------------------- */
+.t-hero,
+.t-product,
+.t-section-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  margin: 0;
+}
+.t-hero          { font-size: var(--t-hero-size);      line-height: var(--t-hero-lh);      letter-spacing: var(--t-hero-ls); }
+.t-product       { font-size: var(--t-product-size);   line-height: var(--t-product-lh);   letter-spacing: var(--t-product-ls); }
+.t-section-display { font-size: var(--t-section-d-size); line-height: var(--t-section-d-lh); letter-spacing: var(--t-section-d-ls); }
+
+.t-section-h,
+.t-card,
+.t-feature,
+.t-body-l,
+.t-body,
+.t-button,
+.t-caption,
+.t-micro {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  margin: 0;
+}
+.t-section-h { font-size: var(--t-section-h-size); line-height: var(--t-section-h-lh); letter-spacing: var(--t-section-h-ls); }
+.t-card      { font-size: var(--t-card-size);      line-height: var(--t-card-lh);      letter-spacing: var(--t-card-ls); }
+.t-feature   { font-size: var(--t-feature-size);   line-height: var(--t-feature-lh);   letter-spacing: var(--t-feature-ls); }
+.t-body-l    { font-size: var(--t-body-l-size);    line-height: var(--t-body-l-lh);    letter-spacing: var(--t-body-l-ls); }
+.t-body      { font-size: var(--t-body-size);      line-height: var(--t-body-lh);      letter-spacing: var(--t-body-ls); }
+.t-button    { font-size: var(--t-button-size);    line-height: var(--t-button-lh);    letter-spacing: var(--t-button-ls); font-weight: 500; }
+.t-caption   { font-size: var(--t-caption-size);   line-height: var(--t-caption-lh);   letter-spacing: var(--t-caption-ls); color: var(--fg-2); }
+.t-micro     { font-size: var(--t-micro-size);     line-height: var(--t-micro-lh);     letter-spacing: var(--t-micro-ls); }
+
+.t-mono {
+  font-family: var(--font-mono);
+  font-size: var(--t-mono-size);
+  line-height: var(--t-mono-lh);
+  letter-spacing: var(--t-mono-ls);
+  text-transform: uppercase;
+  font-weight: 400;
+  margin: 0;
+}
+
+/* ---------- Default heading mapping (for raw markup) --------------------- */
+h1 { font: 400 var(--t-hero-size)/var(--t-hero-lh) var(--font-display); letter-spacing: var(--t-hero-ls); margin: 0; }
+h2 { font: 400 var(--t-section-h-size)/var(--t-section-h-lh) var(--font-ui); letter-spacing: var(--t-section-h-ls); margin: 0; }
+h3 { font: 400 var(--t-card-size)/var(--t-card-lh) var(--font-ui); letter-spacing: var(--t-card-ls); margin: 0; }
+h4 { font: 400 var(--t-feature-size)/var(--t-feature-lh) var(--font-ui); margin: 0; }
+p  { font-size: var(--t-body-size); line-height: var(--t-body-lh); margin: 0; color: var(--fg-1); }
+small { font-size: var(--t-caption-size); line-height: var(--t-caption-lh); color: var(--fg-2); }
+code { font-family: var(--font-mono); font-size: 0.92em; }
+a  { color: var(--color-action-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+hr { border: 0; border-top: var(--border-hairline); margin: 0; }
+
+/* ---------- Utility ------------------------------------------------------ */
+.surface-canvas { background: var(--bg-canvas); color: var(--fg-1); }
+.surface-stone  { background: var(--bg-stone);  color: var(--fg-1); }
+.surface-green  { background: var(--bg-green);  color: var(--fg-on-dark); }
+.surface-navy   { background: var(--bg-navy);   color: var(--fg-on-dark); }
+.surface-dark   { background: var(--bg-dark);   color: var(--fg-on-dark); }
+
+.muted    { color: var(--fg-2); }
+.tertiary { color: var(--fg-3); }
+.faint    { color: var(--fg-4); }

@@ -56,3 +56,18 @@ Key routing rules:
 - Ship/deploy/PR → invoke /ship or /land-and-deploy
 - Save progress → invoke /context-save
 - Resume context → invoke /context-restore
+
+## Design System
+
+Always read `DESIGN.md` before making any visual or UI decision. All font choices, colors, spacing, radii, and aesthetic direction come from there (which in turn inherits from `colors_and_type.css` — Majeve's parent system, code-named Cohere v.alpha).
+
+Do not redefine design tokens in Hub code. Import `colors_and_type.css` directly or copy its `:root` block verbatim.
+
+Hub-specific rules (covered in DESIGN.md, summarized here):
+- Light mode only in v1. Do not introduce dark surfaces.
+- Iframe chrome is stacked (above + below the iframe), never sidebar.
+- Mobile iframe is edge-to-edge, zero gutter.
+- Magic-link submissions show identical generic text for success and failure (anti-enumeration).
+- Hub server injects a CSS shim, viewport-meta tag, and resize-poster script into every served report. The agent (Spectra) is not constrained by an HTML contract.
+
+In QA mode, flag any code that doesn't match DESIGN.md.
