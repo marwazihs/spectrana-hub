@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     # Rate limits
     RATE_LIMIT_MAGIC_LINK_PER_IP_PER_MIN: int = 5
     RATE_LIMIT_MAGIC_LINK_PER_REPORT_PER_HOUR: int = 10
+    # Generous bucket for agent-authenticated mint (per API key). Agents
+    # need to mint many links per hour (one per recipient on a broadcast);
+    # the per-IP and per-report buckets that protect the public form aren't
+    # the right shape here.
+    RATE_LIMIT_MAGIC_LINK_PER_API_KEY_PER_HOUR: int = 100
 
     # Payload limits
     MAX_HTML_BYTES: int = 10 * 1024 * 1024  # 10 MB

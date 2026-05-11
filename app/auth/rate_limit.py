@@ -82,3 +82,15 @@ async def check_magic_link_report(session: AsyncSession, report_id: UUID) -> Non
         window_seconds=3600,
         limit=settings.RATE_LIMIT_MAGIC_LINK_PER_REPORT_PER_HOUR,
     )
+
+
+async def check_magic_link_api_key(session: AsyncSession, customer_id: UUID) -> None:
+    """Agent-auth path uses a per-API-key (per-customer) hourly bucket.
+    Skips the per-IP gate because an agent's IP serves many customers and
+    isn't a meaningful unit of abuse for this surface."""
+    await _bump(
+        session,
+        scope_key=f"apikey:{customer_id}",
+        window_seconds=3600,
+        limit=settings.RATE_LIMIT_MAGIC_LINK_PER_API_KEY_PER_HOUR,
+    )

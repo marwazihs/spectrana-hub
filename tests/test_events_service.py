@@ -131,7 +131,13 @@ async def test_log_magic_link_issued_never_carries_token(session: AsyncSession) 
     assert ev.event_type == "magic_link_issued"
     assert "token" not in ev.payload
     assert "token_hash" not in ev.payload
-    assert ev.payload == {"email": "ops@acme.com", "ip": "1.1.1.1"}
+    # Default delivery is "email" (back-compat with M5 callers); channel_hint
+    # absent unless set explicitly.
+    assert ev.payload == {
+        "email": "ops@acme.com",
+        "ip": "1.1.1.1",
+        "delivery": "email",
+    }
 
 
 async def test_log_magic_link_consumed_carries_jti_not_token(

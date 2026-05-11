@@ -108,12 +108,21 @@ async def log_magic_link_issued(
     customer_id: UUID,
     email: str,
     ip: str,
+    delivery: str = "email",
+    channel_hint: str | None = None,
 ) -> Event:
+    """`delivery` is "email" (Hub sends) or "return" (raw URL handed to a
+    caller, e.g. an agent passing it via chat). `channel_hint` is a free-form
+    label the agent supplies for audit ("slack", "sms"). Token itself is
+    never in the payload — see anti-leak tests in test_events_service."""
+    payload: dict[str, str] = {"email": email, "ip": ip, "delivery": delivery}
+    if channel_hint is not None:
+        payload["channel_hint"] = channel_hint
     return await log_event(
         session,
         event_type="magic_link_issued",
         customer_id=customer_id,
-        payload={"email": email, "ip": ip},
+        payload=payload,
     )
 
 
