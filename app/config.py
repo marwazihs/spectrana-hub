@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     HUB_IFRAME_JWT_SECRET: SecretStr = SecretStr("")
     HUB_IFRAME_JWT_SECRET_PREVIOUS: SecretStr | None = None
     HUB_MAGIC_LINK_HASH_SECRET: SecretStr = SecretStr("")
+    # Shared secret for /internal/* routes consumed by the Next.js frontend
+    # (server-to-server only; never exposed to the browser). Must be ≥32 bytes
+    # in production; an empty value disables /internal/* (401 on every call).
+    HUB_INTERNAL_TOKEN: SecretStr = SecretStr("")
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://hub:hub@localhost:5432/hub"
