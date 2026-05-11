@@ -14,7 +14,7 @@ from app.reports.html_injector import (
 def _has_all_markers(html: bytes) -> bool:
     return (
         SHIM_MARKER in html
-        and b'data-hub-resize="v1"' in html
+        and b'data-hub-resize="v2"' in html
         and b'name="viewport"' in html
     )
 
@@ -29,7 +29,7 @@ def test_fixture_canonical_html_gets_all_three() -> None:
     # Shim sits after <head>, before <title>
     assert out.index(b"<head>") < out.index(SHIM_MARKER) < out.index(b"<title>")
     # Resize-poster sits before </body>
-    assert out.index(b'data-hub-resize="v1"') < out.index(b"</body>")
+    assert out.index(b'data-hub-resize="v2"') < out.index(b"</body>")
 
 
 def test_fixture_no_head_injects_into_body() -> None:
@@ -60,7 +60,7 @@ def test_fixture_existing_viewport_is_left_alone() -> None:
     assert b'content="width=1024"' in out
     # Other two markers still land.
     assert SHIM_MARKER in out
-    assert b'data-hub-resize="v1"' in out
+    assert b'data-hub-resize="v2"' in out
 
 
 def test_fixture_all_three_markers_already_present_is_untouched() -> None:
@@ -102,7 +102,7 @@ def test_partial_markers_present_only_missing_get_added() -> None:
     assert out.count(SHIM_MARKER) == 1
     # Other two are injected.
     assert b'name="viewport"' in out
-    assert b'data-hub-resize="v1"' in out
+    assert b'data-hub-resize="v2"' in out
 
 
 # --- Case-insensitivity ---------------------------------------------------

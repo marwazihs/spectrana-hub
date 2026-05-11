@@ -62,6 +62,12 @@ def _render_etag(s3_etag_like: str) -> str:
 
 
 def _render_headers(etag: str) -> dict[str, str]:
+    # frame-ancestors authorizes the viewer origin (HUB_PRIMARY_DOMAIN). The
+    # Next.js viewer and the iframe content live on *different* origins by
+    # design (DESIGN.md "two origins"), so 'self' would block the embed.
+    # Bare host-source matches both http and https — fine for dev (http
+    # localhost) and prod (https hub.<domain>) without a second env var.
+    viewer_origin = settings.HUB_PRIMARY_DOMAIN
     return {
         "Content-Type": "text/html; charset=utf-8",
         "Content-Security-Policy": (
@@ -69,7 +75,7 @@ def _render_headers(etag: str) -> dict[str, str]:
             "img-src data: https:; "
             "style-src 'unsafe-inline' 'self'; "
             "script-src 'self' 'unsafe-inline'; "
-            "frame-ancestors 'self';"
+            f"frame-ancestors {viewer_origin};"
         ),
         "X-Content-Type-Options": "nosniff",
         "Cache-Control": "private, no-cache, must-revalidate",

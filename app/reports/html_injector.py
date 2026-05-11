@@ -24,10 +24,19 @@ from __future__ import annotations
 import re
 
 
-INJECTOR_VERSION = "v1"
+# Versioned per shim/poster — bumped when either piece of injected payload
+# changes meaningfully (PLAN.md §15.12). The ETag suffix carries the same
+# version so cached intermediaries invalidate on a bump.
+#
+# v2 (M6.8): resize-poster fires post() at parse time + on short setTimeouts,
+# not only on `load` + `resize` + ResizeObserver. Eliminates a race where the
+# parent React component hadn't mounted its message listener by the time the
+# iframe's first post fired (DESIGN.md S2 height adjust would silently never
+# happen). The shim CSS is unchanged.
+INJECTOR_VERSION = "v2"
 
 SHIM_MARKER = b'data-hub-shim="v1"'
-RESIZE_MARKER = b'data-hub-resize="v1"'
+RESIZE_MARKER = b'data-hub-resize="v2"'
 
 CSS_SHIM = (
     b'<style data-hub-shim="v1">'
@@ -45,15 +54,24 @@ VIEWPORT_META = (
     b'<meta name="viewport" content="width=device-width, initial-scale=1">'
 )
 
-# Posts {type, height} to parent on load, resize, and ResizeObserver mutations.
-# Uses document.body.scrollHeight — see §15.12 P2 finding #1 (shrink-case bug).
+# Posts {type, height} to parent on parse, short timeouts, load, resize, and
+# ResizeObserver. The short-timeout chain is the race-recovery for slow
+# parents: the iframe lives on a small static HTML and finishes loading
+# before the Next.js viewer hydrates React + attaches its message listener.
+# Without the timeouts the first (and possibly only) post is delivered
+# before anyone is listening, and the iframe stays at the 640px placeholder.
+# Uses document.body.scrollHeight — see PLAN §15.12 P2 finding #1
+# (documentElement.scrollHeight inflates to the iframe viewport, breaking
+# the shrink case).
 RESIZE_POSTER = (
-    b'<script data-hub-resize="v1">'
+    b'<script data-hub-resize="v2">'
     b"(function(){"
     b"function post(){"
     b"try{parent.postMessage({type:'hub-resize',"
     b"height:document.body.scrollHeight},'*');}catch(e){}"
     b"}"
+    b"post();"
+    b"setTimeout(post,100);setTimeout(post,300);setTimeout(post,800);"
     b"window.addEventListener('load',post);"
     b"window.addEventListener('resize',post);"
     b"if(window.ResizeObserver){"

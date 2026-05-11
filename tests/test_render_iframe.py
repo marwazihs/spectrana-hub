@@ -122,14 +122,16 @@ async def test_render_returns_injected_html_with_security_headers(
     # Security headers per §4.8
     csp = r.headers["content-security-policy"]
     assert "default-src 'self'" in csp
-    assert "frame-ancestors 'self'" in csp
+    # frame-ancestors authorizes the viewer origin (HUB_PRIMARY_DOMAIN), not
+    # 'self' — the viewer and iframe live on different origins by design.
+    assert f"frame-ancestors {settings.HUB_PRIMARY_DOMAIN}" in csp
     assert "script-src 'self' 'unsafe-inline'" in csp
     assert "img-src data: https:" in csp
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["cache-control"] == "private, no-cache, must-revalidate"
     assert r.headers["referrer-policy"] == "no-referrer"
     assert r.headers["etag"].startswith('"') and r.headers["etag"].endswith('"')
-    assert "v1" in r.headers["etag"]
+    assert "v2" in r.headers["etag"]
 
 
 # --- ETag / 304 ----------------------------------------------------------

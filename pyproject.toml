@@ -28,10 +28,12 @@ dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
     "httpx>=0.28.0",
-    "testcontainers[postgres]>=4.8.0",
+    "testcontainers[postgres,minio]>=4.8.0",
     "hypothesis>=6.122.0",
     "ruff>=0.8.0",
     "mypy>=1.13.0",
+    "pytest-playwright>=0.5.2",
+    "boto3>=1.35.0",
 ]
 
 [build-system]
@@ -60,3 +62,6 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "e2e: end-to-end Playwright tests; require Docker + bun + frontend build",
+]
