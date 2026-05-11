@@ -379,11 +379,11 @@ Iframe content origin. Separate origin from the rest of Hub.
 - `Content-Type: text/html; charset=utf-8`
 - `Content-Security-Policy: default-src 'self'; img-src data: https:; style-src 'unsafe-inline' 'self'; script-src 'self' 'unsafe-inline'; frame-ancestors 'self';`
 - `X-Content-Type-Options: nosniff`
-- `Cache-Control: private, max-age=3600, immutable`
+- `Cache-Control: private, no-cache, must-revalidate`
 - `ETag: <s3-object-etag-with-injector-version-suffix>`
 - `Referrer-Policy: no-referrer`
 
-`If-None-Match` matching the ETag returns 304 with no body. ETag includes the injector version suffix so a shim/resize-poster bump invalidates cached entries.
+`If-None-Match` matching the ETag returns 304 with no body. ETag includes the injector version suffix so a shim/resize-poster bump invalidates cached entries. **Cache-Control rationale (revised 2026-05-10):** prior draft used `max-age=3600, immutable` for performance, but `immutable` is wrong for this endpoint — Spectra can overwrite the same S3 object for an existing `report_id` (e.g. agent re-runs after a data correction), and `immutable` tells the browser not to revalidate even when the user explicitly reloads. `no-cache, must-revalidate` forces the browser to round-trip every time, and the ETag still produces a fast 304 when S3 content hasn't changed. Customers never see a stale report.
 
 **CSP rationale (revised 2026-05-10):** the prior draft used `script-src 'none'` to block agent-supplied scripts. Per Appendix A of the Majeve brief, Spectra runs inside the customer's own AWS/GCP VPC with direct read access to source systems and the LLM — the trust boundary is upstream of Hub, not at iframe render. `script-src 'none'` would also block Hub's resize-poster (DESIGN.md §"Hub Server Responsibilities"). `'self' 'unsafe-inline'` allows Hub's injected script and any inline scripts in agent HTML, while `frame-ancestors 'self'` still blocks clickjacking and `default-src 'self'` still constrains outbound resource loads.
 
@@ -1091,7 +1091,10 @@ Browser GET /r/abc-123?token=raw-token-here
     const onMessage = (e: MessageEvent) => {
       if (e.source !== iframeRef.current?.contentWindow) return;
       if (e.data?.type !== 'hub-resize') return;
-      iframeRef.current.style.height = `${e.data.height}px`;
+      // Math.ceil + 1px buffer: sub-pixel rounding can leave 1px overflow
+      // which triggers a scrollbar on some browsers. Belt-and-suspenders
+      // with the injector's `html, body { overflow: hidden }` (§15.12).
+      iframeRef.current.style.height = `${Math.ceil(e.data.height) + 1}px`;
     };
     window.addEventListener('message', onMessage);
     // One-shot viewport beacon for events.report_view.viewport_width
@@ -1224,17 +1227,17 @@ def inject(html: bytes) -> bytes:
 
 **What it injects** (verbatim from DESIGN.md §"Hub Server Responsibilities"):
 
-1. **CSS shim** — `<style data-hub-shim="v1">` block immediately after `<head>` (or at start of `<body>` if `<head>` absent). Rules: `:root { font-size: 16px; -webkit-text-size-adjust: 100%; }`, `*, *::before, *::after { box-sizing: border-box; }`, `body { margin: 0; }`, `img, video, svg { max-width: 100%; height: auto; }`, `table { display: block; max-width: 100%; overflow-x: auto; }`, `pre, code { overflow-x: auto; word-wrap: break-word; white-space: pre-wrap; }`.
+1. **CSS shim** — `<style data-hub-shim="v1">` block immediately after `<head>` (or at start of `<body>` if `<head>` absent). Rules: `:root { font-size: 16px; -webkit-text-size-adjust: 100%; }`, `*, *::before, *::after { box-sizing: border-box; }`, `html, body { overflow: hidden; }`, `body { margin: 0; }`, `img, video, svg { max-width: 100%; height: auto; }`, `table { display: block; max-width: 100%; overflow-x: auto; }`, `pre, code { overflow-x: auto; word-wrap: break-word; white-space: pre-wrap; }`. The `html, body { overflow: hidden }` rule enforces the "one continuous scroll" contract (DESIGN.md S2) during the 50-100ms window between iframe load and first postMessage arrival — without it, users see a brief flash of nested scrollbar before the parent ResizeListener (§15.6) takes over.
 
 2. **Viewport meta** — `<meta name="viewport" content="width=device-width, initial-scale=1">` injected into `<head>` only if absent.
 
-3. **Resize-poster** — `<script data-hub-resize="v1">` immediately before `</body>` (or at end of `<body>` if `</body>` absent). Posts `{type: 'hub-resize', height: document.documentElement.scrollHeight}` to parent on `load`, `resize`, and `ResizeObserver` body mutations.
+3. **Resize-poster** — `<script data-hub-resize="v1">` immediately before `</body>` (or at end of `<body>` if `</body>` absent). Posts `{type: 'hub-resize', height: document.body.scrollHeight}` to parent on `load`, `resize`, and `ResizeObserver` body mutations. **Must read `document.body.scrollHeight`, NOT `document.documentElement.scrollHeight`** — `documentElement.scrollHeight` inflates to the iframe viewport size when content is shorter than the viewport, which prevents the iframe from ever shrinking after a content swap (e.g. user navigates from a long report to a short one in the same session). Verified live during P2 mockup review: a 370px-content iframe stayed locked at 1159px when `documentElement.scrollHeight` was used.
 
 **Idempotency rule:** detection is a literal byte-search for `data-hub-shim="v1"` and `data-hub-resize="v1"`. Each marker is checked independently; missing markers get injected, present markers get skipped. If Spectra ever emits HTML with all three already, Hub serves it untouched.
 
 **Test plan (M7):**
 - Unit: 6 fixture HTMLs (no head; no body; no viewport; all-three-already-present; malformed; minified-on-one-line). Assert: idempotent (run twice, second pass = no change), all three markers present after first pass, valid HTML out for valid HTML in.
-- Integration: e2e Playwright — load `/render/<id>` for a fixture report at viewport 375px, 768px, 1200px; assert iframe content reflows AND parent iframe height matches `document.documentElement.scrollHeight` within 50ms of load.
+- Integration: e2e Playwright — load `/render/<id>` for a fixture report at viewport 375px, 768px, 1200px; assert iframe content reflows AND parent iframe height matches `document.body.scrollHeight` within 50ms of load. **Shrink-case fixture required:** load a long report, then swap the iframe `src` to a short report (≤500px content) in the same session, assert parent iframe height shrinks to the short report's `body.scrollHeight` (regression guard for the `documentElement.scrollHeight` trap).
 - Regression: snapshot test asserting injector version suffix in ETag changes when the shim or poster changes (otherwise stale cached entries serve old shim).
 
 **Versioning:** marker stays `v1` until shim CSS or poster JS changes meaningfully. When it does, bump to `v2` AND change the ETag suffix in §4.8 so caches invalidate.
@@ -1242,6 +1245,17 @@ def inject(html: bytes) -> bytes:
 **Distribution:** module ships as part of M4. No new container, no separate deploy. Lives in the same FastAPI process as `/render`.
 
 **Why this lives in M4, not M3:** the injector runs on the *render* path (read), not the *publish* path (write). M3 owns POST /v1/reports and stores HTML to S3 verbatim — no transformation at ingest. The injector is purely a serve-time concern.
+
+**Pre-implementation findings captured 2026-05-10** (from P2 mockup review, verified live with Playwright across short/medium/long sample reports):
+
+| # | Severity | Finding | Landed in |
+|---|---|---|---|
+| 1 | High | Resize-poster must use `document.body.scrollHeight`, not `documentElement.scrollHeight` (shrink-case bug) | §15.12 above (contract + test plan) |
+| 2 | Medium | CSS shim must include `html, body { overflow: hidden }` (race-window scrollbar flash) | §15.12 above |
+| 3 | Low | Parent ResizeListener should use `Math.ceil(h) + 1` (sub-pixel overflow guard) | §15.6 ResizeListener |
+| 4 | Low | Render endpoint Cache-Control must drop `immutable` (Spectra can rewrite same `report_id`) | §4.8 |
+
+All four were caught during the plan-driven HTML mockup pass (P1 + P2 via `/design-html`); P2 finalized artifacts at `~/.gstack/projects/marwazihs-spectrana-hub/designs/p2-report-viewer-20260510/finalized.{html,json}`.
 
 ---
 
