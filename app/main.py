@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from app.config import settings
 from app.errors import HubError, hub_error_handler
+from app.jobs.scheduler import start_scheduler
 
 
 logging.basicConfig(
@@ -24,8 +25,12 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         settings.HUB_PRIMARY_DOMAIN,
         settings.HUB_REPORTS_DOMAIN,
     )
-    yield
-    logger.info("hub shutting down")
+    scheduler = start_scheduler()
+    try:
+        yield
+    finally:
+        scheduler.shutdown(wait=False)
+        logger.info("hub shutting down")
 
 
 app = FastAPI(
