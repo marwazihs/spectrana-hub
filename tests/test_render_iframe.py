@@ -36,6 +36,10 @@ def _iframe_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
         SecretStr("test-iframe-secret-padded-to-at-least-32-bytes-cccccccc"),
     )
     monkeypatch.setattr(settings, "HUB_IFRAME_JWT_SECRET_PREVIOUS", None)
+    # M8 Host-header guard: /render only responds when the request arrives on
+    # the reports origin. AsyncClient sets Host from base_url ("reports.test"
+    # below), so configure the setting to match.
+    monkeypatch.setattr(settings, "HUB_REPORTS_DOMAIN", "reports.test")
 
 
 @pytest_asyncio.fixture
@@ -289,3 +293,88 @@ async def test_render_previous_secret_still_verifies_during_rotation_overlap(
     )
     r = await client.get(f"/render/{rid}", params={"t": old_token})
     assert r.status_code == 200
+
+
+# --- Host-header guard (M8) ---------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_render_404_when_host_does_not_match_reports_domain(
+    client: AsyncClient, session: AsyncSession, fake_s3: FakeS3
+) -> None:
+    """A request that arrives on HUB_PRIMARY_DOMAIN (or any host other than
+    HUB_REPORTS_DOMAIN) must look like the route does not exist. Anti-enum
+    posture: same shape as report-not-found."""
+    c, rid = await _seed_customer_and_report(
+        session, fake_s3, html=b"<html><body>x</body></html>"
+    )
+    token = mint_iframe_jwt(report_id=rid, customer_id=c.id)
+    r = await client.get(
+        f"/render/{rid}",
+        params={"t": token},
+        headers={"Host": "hub.test"},  # primary domain, not reports
+    )
+    assert r.status_code == 404
+    payload = r.json()
+    assert "report-not-found" in payload.get("type", payload.get("slug", ""))
+
+
+@pytest.mark.asyncio
+async def test_render_accepts_x_forwarded_host_for_reports_domain(
+    client: AsyncClient, session: AsyncSession, fake_s3: FakeS3
+) -> None:
+    """Behind a TLS-terminating LB, Host is the internal name and the public
+    hostname lands in X-Forwarded-Host. The guard must prefer XFH when set."""
+    c, rid = await _seed_customer_and_report(
+        session, fake_s3, html=b"<html><body>x</body></html>"
+    )
+    token = mint_iframe_jwt(report_id=rid, customer_id=c.id)
+    r = await client.get(
+        f"/render/{rid}",
+        params={"t": token},
+        headers={
+            "Host": "hub-internal-name",
+            "X-Forwarded-Host": "reports.test",
+        },
+    )
+    assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_render_404_when_x_forwarded_host_does_not_match(
+    client: AsyncClient, session: AsyncSession, fake_s3: FakeS3
+) -> None:
+    """XFH is preferred when present. If it says hub.<domain>, reject even
+    if the inner Host header would have matched."""
+    c, rid = await _seed_customer_and_report(
+        session, fake_s3, html=b"<html><body>x</body></html>"
+    )
+    token = mint_iframe_jwt(report_id=rid, customer_id=c.id)
+    r = await client.get(
+        f"/render/{rid}",
+        params={"t": token},
+        headers={
+            "Host": "reports.test",
+            "X-Forwarded-Host": "hub.test",
+        },
+    )
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_render_404_when_reports_domain_unconfigured(
+    client: AsyncClient,
+    session: AsyncSession,
+    fake_s3: FakeS3,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fail-closed: an empty HUB_REPORTS_DOMAIN must reject every request,
+    not match every request (an empty-string compare would otherwise be
+    satisfied by any missing Host header)."""
+    monkeypatch.setattr(settings, "HUB_REPORTS_DOMAIN", "")
+    c, rid = await _seed_customer_and_report(
+        session, fake_s3, html=b"<html><body>x</body></html>"
+    )
+    token = mint_iframe_jwt(report_id=rid, customer_id=c.id)
+    r = await client.get(f"/render/{rid}", params={"t": token})
+    assert r.status_code == 404

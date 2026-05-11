@@ -1,34 +1,30 @@
-services:
-  hub:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://hub:hub@postgres:5432/hub
-      AWS_S3_ENDPOINT_URL: http://minio:9000
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
-      AWS_S3_BUCKET: hub-reports-dev
-      AWS_REGION: us-east-1
-      HUB_PRIMARY_DOMAIN: hub.local
-      HUB_REPORTS_DOMAIN: reports.hub.local
-      HUB_EMAIL_FROM: "Hub Dev <dev@hub.local>"
-      HUB_EMAIL_BRAND_NAME: Hub-Dev
-      HUB_SESSION_SECRET: dev-session-secret-not-for-prod
-      HUB_IFRAME_JWT_SECRET: dev-iframe-jwt-not-for-prod
-      HUB_MAGIC_LINK_HASH_SECRET: dev-magic-link-not-for-prod
-      LOG_LEVEL: DEBUG
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    develop:
-      watch:
-        - action: sync+restart
-          path: ./app
-          target: /app/app
+# Local-dev stack for the full project (M8).
+#
+# `docker compose up` brings up the four pieces a human needs to test the
+# Hub end-to-end on a laptop:
+#   - postgres:5432   shared DB
+#   - minio:9000      S3-compatible object store
+#   - migrate         one-shot `alembic upgrade head`; hub depends on it
+#   - hub:8000        FastAPI (reports + iframe + internal routes)
+#   - frontend:3000   Next.js viewer chrome
+#
+# Cookie + CORS-style boundaries assume the browser hits localhost:3000 for
+# the viewer and localhost:8000 for the iframe. HUB_INTERNAL_TOKEN is the
+# shared server-to-server credential; ALL three services that read it use
+# the SAME value, sourced from the host environment or this file's default.
+#
+# Cross-origin notes:
+#   - hub_session cookie is set host-only on localhost:3000 (frontend
+#     issues it on /r/[id]/consume) and is NOT sent to localhost:8000 —
+#     correct. Internal calls go server-to-server inside the docker
+#     network (frontend → hub:8000), so the cookie boundary holds.
+#   - HUB_COOKIE_SECURE=0 here because the local stack is http. In any
+#     deployed setting, unset it (or set to 1) so cookies are Secure.
 
+x-shared-internal-token: &internal-token
+  HUB_INTERNAL_TOKEN: ${HUB_INTERNAL_TOKEN:-dev-internal-token-not-for-prod-padded-to-32-bytes-zzzz}
+
+services:
   postgres:
     image: postgres:16
     environment:
@@ -61,6 +57,96 @@ services:
       interval: 2s
       timeout: 2s
       retries: 20
+
+  # One-shot service: create the S3 bucket if missing. Idempotent; uses
+  # mc's standard pattern (alias → mb --ignore-existing). Without this,
+  # Hub's first POST /v1/reports against a fresh MinIO 404s on the bucket.
+  bucket-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mc alias set local http://minio:9000 minioadmin minioadmin &&
+        mc mb --ignore-existing local/hub-reports-dev
+    restart: "no"
+
+  # One-shot service: run alembic upgrade head, exit 0. hub depends on this
+  # with service_completed_successfully so the API never serves traffic
+  # against an unmigrated schema. Re-running compose is idempotent —
+  # alembic is a no-op when already at head.
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://hub:hub@postgres:5432/hub
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  hub:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *internal-token
+      DATABASE_URL: postgresql+asyncpg://hub:hub@postgres:5432/hub
+      AWS_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_S3_BUCKET: hub-reports-dev
+      AWS_REGION: us-east-1
+      # Browser-facing hosts. The viewer (Next.js) runs on :3000 and the
+      # iframe (Hub /render) runs on :8000. CSP `frame-ancestors` and the
+      # M8 Host-header guard both read these values.
+      HUB_PRIMARY_DOMAIN: localhost:3000
+      HUB_REPORTS_DOMAIN: localhost:8000
+      HUB_EMAIL_FROM: "Hub Dev <dev@hub.local>"
+      HUB_EMAIL_BRAND_NAME: Hub-Dev
+      HUB_SESSION_SECRET: dev-session-secret-not-for-prod-padded-to-32-bytes
+      HUB_IFRAME_JWT_SECRET: dev-iframe-jwt-not-for-prod-padded-to-32-bytes
+      HUB_MAGIC_LINK_HASH_SECRET: dev-magic-link-not-for-prod-padded-to-32-bytes
+      LOG_LEVEL: DEBUG
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      bucket-init:
+        condition: service_completed_successfully
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./app
+          target: /app/app
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # Browser sees this in the iframe `src` attribute. Must be the
+        # externally-reachable host:port, not the docker service name.
+        NEXT_PUBLIC_HUB_REPORTS_DOMAIN: localhost:8000
+    ports:
+      - "3000:3000"
+    environment:
+      <<: *internal-token
+      # Server-side calls from Next.js → Hub use Docker DNS (in-network).
+      # This URL never reaches the browser.
+      HUB_API_BASE_URL: http://hub:8000
+      # Local stack runs over http; production should unset this so cookies
+      # default to Secure.
+      HUB_COOKIE_SECURE: "0"
+    depends_on:
+      hub:
+        condition: service_started
 
 volumes:
   hub_postgres_data:

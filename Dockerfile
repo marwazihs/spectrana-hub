@@ -20,6 +20,14 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-install-project --no-dev
 
 COPY app/ ./app/
+# alembic.ini + alembic/ ship in the image so the `migrate` compose service
+# can run `alembic upgrade head` against the same DB the Hub will use.
+# Operational scripts (manage_customer.py) are likewise inside the image so
+# `docker compose exec hub uv run python -m scripts.manage_customer ...`
+# works in any environment.
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
+COPY scripts/ ./scripts/
 
 EXPOSE 8000
 

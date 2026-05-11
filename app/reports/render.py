@@ -52,6 +52,38 @@ iframe_router = APIRouter(tags=["iframe"])
 viewer_router = APIRouter(tags=["viewer"])
 
 
+# === Host-header guard (M8) =============================================
+
+
+def _effective_host(request: Request) -> str:
+    """Host the client used to reach us. Prefer X-Forwarded-Host so that
+    behind a TLS-terminating LB we still match against the public hostname,
+    not the internal Docker name. Always lowercased; first value wins when
+    the header is a comma-separated chain."""
+    fwd = request.headers.get("x-forwarded-host")
+    if fwd:
+        return fwd.split(",")[0].strip().lower()
+    return request.headers.get("host", "").lower()
+
+
+def require_reports_host(request: Request) -> None:
+    """Reject /render/* requests that arrive on any host other than
+    HUB_REPORTS_DOMAIN. In production the LB routes `reports.<domain>/*`
+    to FastAPI; `hub.<domain>/api/*` and `hub.<domain>/*` (Next.js) also
+    reach this container, so an unguarded /render is reachable via the
+    primary domain and would defeat the two-origin design (DESIGN.md
+    "two origins"). 404 (report-not-found) rather than 403 so the wrong-
+    host case looks identical to "no such report" from the outside."""
+    configured = settings.HUB_REPORTS_DOMAIN.lower()
+    if not configured:
+        # Belt-and-suspenders: an empty configured domain would make every
+        # Host header match (`"" == ""`). Treat unconfigured as "all
+        # requests rejected" so a forgotten env var fails closed.
+        raise report_not_found()
+    if _effective_host(request) != configured:
+        raise report_not_found()
+
+
 # === Iframe content origin (unchanged from M4.2) ========================
 
 
@@ -84,7 +116,10 @@ def _render_headers(etag: str) -> dict[str, str]:
     }
 
 
-@iframe_router.get("/render/{report_id}")
+@iframe_router.get(
+    "/render/{report_id}",
+    dependencies=[Depends(require_reports_host)],
+)
 async def render_iframe(
     report_id: UUID,
     session: Annotated[AsyncSession, Depends(get_session)],
