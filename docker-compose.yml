@@ -1,0 +1,67 @@
+services:
+  hub:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://hub:hub@postgres:5432/hub
+      AWS_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_S3_BUCKET: hub-reports-dev
+      AWS_REGION: us-east-1
+      HUB_PRIMARY_DOMAIN: hub.local
+      HUB_REPORTS_DOMAIN: reports.hub.local
+      HUB_EMAIL_FROM: "Hub Dev <dev@hub.local>"
+      HUB_EMAIL_BRAND_NAME: Hub-Dev
+      HUB_SESSION_SECRET: dev-session-secret-not-for-prod
+      HUB_IFRAME_JWT_SECRET: dev-iframe-jwt-not-for-prod
+      HUB_MAGIC_LINK_HASH_SECRET: dev-magic-link-not-for-prod
+      LOG_LEVEL: DEBUG
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./app
+          target: /app/app
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: hub
+      POSTGRES_PASSWORD: hub
+      POSTGRES_DB: hub
+    ports:
+      - "5432:5432"
+    volumes:
+      - hub_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hub -d hub"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - hub_minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+volumes:
+  hub_postgres_data:
+  hub_minio_data:
