@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.models import Customer
 from app.auth.service import (
     consume_magic_link,
     mint_iframe_jwt,
@@ -137,6 +138,13 @@ class IframeJwtRequest(BaseModel):
 class IframeJwtResponse(BaseModel):
     token: str
     ttl_seconds: int
+    # Report metadata for the chrome (DESIGN.md S2 metadata row). Bundled
+    # here so Next.js renders the chrome in one round-trip; a separate
+    # /internal/report-metadata endpoint would add a hop with no benefit
+    # since both calls happen in the same server render anyway.
+    report_title: str
+    customer_name: str
+    generated_at: datetime
 
 
 def _iframe_unauthorized() -> HubError:
@@ -179,11 +187,19 @@ async def mint_iframe_jwt_internal(
     if report is None or report.customer_id != auth_session.customer_id:
         raise _iframe_unauthorized()
 
+    customer = await session.get(Customer, auth_session.customer_id)
+    if customer is None:  # pragma: no cover — FK guarantees this
+        raise _iframe_unauthorized()
+
     await session.commit()  # persist the sliding-window refresh on session row
 
     token = mint_iframe_jwt(
         report_id=body.report_id, customer_id=auth_session.customer_id
     )
     return IframeJwtResponse(
-        token=token, ttl_seconds=settings.IFRAME_JWT_TTL_SECONDS
+        token=token,
+        ttl_seconds=settings.IFRAME_JWT_TTL_SECONDS,
+        report_title=report.title,
+        customer_name=customer.name,
+        generated_at=report.generated_at,
     )

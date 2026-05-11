@@ -92,6 +92,9 @@ export async function consumeMagicLink(
 export type IframeJwtResponse = {
   token: string;
   ttl_seconds: number;
+  report_title: string;
+  customer_name: string;
+  generated_at: string; // ISO 8601
 };
 
 /**

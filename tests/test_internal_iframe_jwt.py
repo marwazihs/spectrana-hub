@@ -128,6 +128,10 @@ async def test_iframe_jwt_happy_path_returns_decodable_jwt(
     assert resp.status_code == 200
     body = resp.json()
     assert body["ttl_seconds"] == 60
+    # Metadata bundled for the chrome render — DESIGN.md S2 metadata row.
+    assert body["report_title"] == "t"
+    assert body["customer_name"] == "Acme"
+    assert body["generated_at"]  # ISO datetime
 
     payload = pyjwt.decode(
         body["token"],

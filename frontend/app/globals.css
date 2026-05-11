@@ -24,3 +24,23 @@ input, button, select, textarea {
 }
 
 /* Disable native iOS form zoom-on-focus by keeping inputs ≥16px (S1 spec). */
+
+/* === S2 chrome — mobile edge-to-edge iframe (DESIGN.md) =================
+   The iframe container goes full-bleed on narrow viewports; the iframe's
+   responsive HTML gets every available pixel. Header/footer keep their
+   gutters. Targets the chrome's iframe wrap by class hook so we don't
+   need a media query inside the inline-style React component. */
+@media (max-width: 768px) {
+  [data-hub-chrome="iframe-wrap"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  [data-hub-chrome="iframe-wrap"] iframe {
+    border-left: 0 !important;
+    border-right: 0 !important;
+    border-radius: 0 !important;
+  }
+  [data-hub-chrome="title"] {
+    font-size: 24px !important;
+  }
+}
