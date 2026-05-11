@@ -22,14 +22,21 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Prefer an explicit URL on the Config object (tests inject one via
+# cfg.set_main_option). Fall back to app settings for normal runs.
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 target_metadata = Base.metadata
 
 
+def _effective_url() -> str:
+    return config.get_main_option("sqlalchemy.url") or settings.DATABASE_URL
+
+
 def run_migrations_offline() -> None:
     context.configure(
-        url=settings.DATABASE_URL,
+        url=_effective_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -51,7 +58,7 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_migrations_online() -> None:
     cfg = config.get_section(config.config_ini_section) or {}
-    cfg["sqlalchemy.url"] = settings.DATABASE_URL
+    cfg["sqlalchemy.url"] = _effective_url()
     connectable = async_engine_from_config(
         cfg,
         prefix="sqlalchemy.",

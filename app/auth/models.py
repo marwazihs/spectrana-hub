@@ -8,7 +8,8 @@ limits dominant, it can move without contract impact — table name is stable.
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -28,7 +29,7 @@ class Customer(Base):
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
     allowlist_emails: Mapped[list[str]] = mapped_column(
-        ARRAY(String), nullable=False, server_default="{}"
+        ARRAY(Text), nullable=False, server_default="{}"
     )
     api_key_hash: Mapped[str] = mapped_column(String, nullable=False)
     api_key_prefix: Mapped[str] = mapped_column(String, nullable=False)

@@ -15,7 +15,6 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import (
-    ARRAY,
     BigInteger,
     Computed,
     DateTime,
@@ -23,8 +22,9 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -49,7 +49,7 @@ class Report(Base):
         String, nullable=False, server_default=""
     )
     tags: Mapped[list[str]] = mapped_column(
-        ARRAY(String), nullable=False, server_default="{}"
+        ARRAY(Text), nullable=False, server_default="{}"
     )
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
