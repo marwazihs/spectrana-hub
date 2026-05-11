@@ -77,9 +77,11 @@ export function Chrome({
             <span>{generatedLabel}</span>
           </p>
         </div>
-        <a href={`/r/${reportId}/signout`} style={signoutStyle}>
-          Sign out
-        </a>
+        <form method="POST" action={`/r/${reportId}/signout`} style={signoutFormStyle}>
+          <button type="submit" style={signoutStyle}>
+            Sign out
+          </button>
+        </form>
       </header>
 
       <div data-hub-chrome="iframe-wrap" style={iframeWrapStyle}>
@@ -170,11 +172,21 @@ function formatGeneratedAt(iso: string): string {
   });
 }
 
+const signoutFormStyle: React.CSSProperties = {
+  flexShrink: 0,
+  margin: 0,
+};
+
 const signoutStyle: React.CSSProperties = {
   fontSize: "var(--t-button-size)",
   fontWeight: 500,
   color: "var(--fg-2)",
   textDecoration: "none",
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+  fontFamily: "inherit",
   flexShrink: 0,
 };
 

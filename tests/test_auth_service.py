@@ -241,3 +241,22 @@ async def test_verify_session_expired_returns_none(session: AsyncSession) -> Non
 
     result = await verify_and_refresh_session(session, row.id)
     assert result is None
+
+
+async def test_revoke_session_deletes_row(session: AsyncSession) -> None:
+    from app.auth.service import revoke_session
+
+    customer = await _make_customer(session)
+    row = await mint_session(session, customer_id=customer.id, email="ops@acme.com")
+    sid = row.id
+
+    deleted = await revoke_session(session, sid)
+    assert deleted is True
+    assert await verify_and_refresh_session(session, sid) is None
+
+
+async def test_revoke_session_missing_is_idempotent(session: AsyncSession) -> None:
+    from app.auth.service import revoke_session
+
+    deleted = await revoke_session(session, uuid4())
+    assert deleted is False

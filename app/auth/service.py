@@ -177,3 +177,16 @@ async def verify_and_refresh_session(
     row.expires_at = now + timedelta(days=settings.SESSION_TTL_DAYS)
     await session.flush()
     return row
+
+
+async def revoke_session(session: AsyncSession, session_id: UUID) -> bool:
+    """Delete a session row. Idempotent: returns True if a row was deleted,
+    False if none existed. Caller is responsible for clearing the cookie on
+    the browser side regardless of the return value (anti-enum: don't branch
+    response on revoke outcome)."""
+    row = await session.get(AuthSession, session_id)
+    if row is None:
+        return False
+    await session.delete(row)
+    await session.flush()
+    return True

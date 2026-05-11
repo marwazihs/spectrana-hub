@@ -240,3 +240,31 @@ def test_agent_path_returns_404_for_cross_customer_report(
     payload = json.loads(err.read())
     # Slug surface (errors.py): "report-not-found".
     assert "report-not-found" in payload.get("slug", payload.get("type", "")), payload
+
+
+# ---------------------------------------------------------------------------
+# 9. Sign out — POST clears cookie, lands on email-entry (M6.9)
+# ---------------------------------------------------------------------------
+
+
+def test_signout_clears_cookie_and_returns_to_email_entry(
+    page: Page, mint_link, seeded: dict[str, Any]
+) -> None:
+    """Clicking the chrome's Sign out button POSTs to /r/[id]/signout. Hub
+    deletes the session row, Next.js clears the `hub_session` cookie, the
+    response is a 303 to /r/[id], and S1 email-entry renders again."""
+    url = mint_link(seeded["report_id"])
+    page.goto(url, wait_until="networkidle")
+    # Sanity: chrome is rendered and the session cookie is present.
+    expect(page.get_by_role("heading", name="Acme Q1 Report")).to_be_visible()
+    cookies_before = page.context.cookies(f"http://{NEXT_HOST}:{NEXT_PORT}/")
+    assert any(c["name"] == "hub_session" for c in cookies_before)
+
+    page.get_by_role("button", name="Sign out").click()
+    # After the 303, we land back on /r/[id] with S1 visible.
+    expect(page.get_by_role("heading", name="View your report")).to_be_visible()
+    # hub_session cookie must be gone from the browser.
+    cookies_after = page.context.cookies(f"http://{NEXT_HOST}:{NEXT_PORT}/")
+    assert not any(
+        c["name"] == "hub_session" and c["value"] for c in cookies_after
+    ), cookies_after

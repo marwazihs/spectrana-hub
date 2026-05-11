@@ -27,6 +27,7 @@ from app.auth.service import (
     consume_magic_link,
     mint_iframe_jwt,
     mint_session,
+    revoke_session,
     verify_and_refresh_session,
 )
 from app.config import settings
@@ -203,3 +204,34 @@ async def mint_iframe_jwt_internal(
         customer_name=customer.name,
         generated_at=report.generated_at,
     )
+
+
+# === M6.9: session revoke (sign-out) ===================================
+
+
+class RevokeSessionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: UUID
+
+
+class RevokeSessionResponse(BaseModel):
+    status: str = "ok"
+
+
+@router.post(
+    "/session/revoke",
+    response_model=RevokeSessionResponse,
+    dependencies=[Depends(require_internal_token)],
+)
+async def revoke_session_internal(
+    body: RevokeSessionRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> RevokeSessionResponse:
+    """Delete the session row for the given session_id. Idempotent: returns
+    200 whether or not a row existed. Next.js clears the `hub_session` cookie
+    on its side regardless of the response body — the cookie is the only thing
+    the browser sees, and Hub stays the source of truth for the row's absence."""
+    await revoke_session(session, body.session_id)
+    await session.commit()
+    return RevokeSessionResponse()

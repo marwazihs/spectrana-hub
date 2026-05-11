@@ -120,3 +120,23 @@ export async function mintIframeJwt(
 }
 
 export const HUB_SESSION_COOKIE = "hub_session";
+
+/**
+ * Revoke a session server-side. Idempotent on Hub: a missing row is not an
+ * error. Caller still clears the cookie on the browser regardless of the
+ * outcome — the cookie is what gates the next request.
+ */
+export async function revokeSession(sessionId: string): Promise<void> {
+  const r = await fetch(`${hubBase()}/internal/session/revoke`, {
+    method: "POST",
+    headers: internalHeaders(),
+    body: JSON.stringify({ session_id: sessionId }),
+    cache: "no-store",
+  });
+  if (!r.ok) {
+    // Surface the failure so the caller can decide. Sign-out itself doesn't
+    // block on Hub success — we always clear the cookie — but a non-2xx is
+    // worth logging on the route side.
+    throw new Error(`Hub session revoke failed: ${r.status}`);
+  }
+}
