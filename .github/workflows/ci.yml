@@ -1,0 +1,122 @@
+name: CI
+
+# Minimal v1 CI: gate on the suite that's actually green today.
+#
+# Lint, format-check, and mypy are intentionally NOT enforced here — the
+# repo carries pre-existing violations (48 ruff, 30 unformatted, 9 mypy)
+# that belong in a dedicated code-quality phase, not blocking every PR
+# the day CI lands. Add them as required steps after the cleanup pass.
+
+on:
+  push:
+    branches: [develop, master]
+  pull_request:
+    branches: [develop, master]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hub
+          POSTGRES_PASSWORD: hub
+          POSTGRES_DB: hub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hub -d hub"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+asyncpg://hub:hub@localhost:5432/hub
+      # Test fixtures monkeypatch these where they matter; defaults here
+      # just keep `Settings()` instantiation from failing during import.
+      HUB_SESSION_SECRET: ci-session-secret-padded-to-at-least-32-bytes-aa
+      HUB_IFRAME_JWT_SECRET: ci-iframe-secret-padded-to-at-least-32-bytes-bb
+      HUB_MAGIC_LINK_HASH_SECRET: ci-magic-secret-padded-to-at-least-32-bytes-cc
+      HUB_INTERNAL_TOKEN: ci-internal-token-padded-to-at-least-32-bytes-dd
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.5.4"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install deps
+        run: uv sync --frozen --dev
+
+      - name: Alembic upgrade head
+        run: uv run alembic upgrade head
+
+      - name: Pytest (excludes e2e)
+        run: uv run pytest tests --ignore=tests/e2e -q
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build
+        # NEXT_PUBLIC_HUB_REPORTS_DOMAIN is baked into the bundle at build
+        # time. CI just needs *some* value so next build succeeds; the real
+        # value is set at image-build time in Dockerfile.frontend.
+        env:
+          NEXT_PUBLIC_HUB_REPORTS_DOMAIN: ci.local
+        run: bun run build
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build Hub image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: false
+          cache-from: type=gha,scope=hub
+          cache-to: type=gha,scope=hub,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.frontend
+          push: false
+          load: false
+          build-args: |
+            NEXT_PUBLIC_HUB_REPORTS_DOMAIN=ci.local
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max

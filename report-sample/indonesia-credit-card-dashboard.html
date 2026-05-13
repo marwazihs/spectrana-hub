@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Indonesia’s Credit Card Story: Growth Nationwide, Divergence by Region</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6fbf8;
+      --bg-soft: #eef8f3;
+      --panel: rgba(255,255,255,.9);
+      --panel-strong: #ffffff;
+      --text: #18322b;
+      --muted: #5f7b72;
+      --line: #dcebe4;
+      --mint: #46b98d;
+      --teal: #1f8a88;
+      --sky: #68b4ff;
+      --coral: #ff8f70;
+      --gold: #f2b84b;
+      --shadow: 0 14px 40px rgba(71, 122, 101, 0.10);
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(117, 231, 183, .26), transparent 28%),
+        radial-gradient(circle at top right, rgba(104, 180, 255, .18), transparent 26%),
+        linear-gradient(180deg, #f8fdfa 0%, #f4fbf7 40%, #f8fcff 100%);
+    }
+    .wrap { max-width: 1380px; margin: 0 auto; padding: 28px; }
+    .hero {
+      padding: 34px;
+      border-radius: 30px;
+      background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(238,248,243,.92));
+      border: 1px solid rgba(220,235,228,.95);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 22px;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      right: -80px;
+      top: -120px;
+      background: radial-gradient(circle, rgba(104,180,255,.22), transparent 68%);
+      pointer-events: none;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(70,185,141,.10);
+      color: var(--teal);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 16px;
+    }
+    h1, h2, h3, p { margin: 0; }
+    h1 {
+      font-size: clamp(32px, 5vw, 54px);
+      line-height: 1.02;
+      letter-spacing: -.04em;
+      max-width: 860px;
+      margin-bottom: 14px;
+    }
+    .lead {
+      max-width: 900px;
+      font-size: 18px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .meta-pill {
+      background: rgba(255,255,255,.82);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .grid { display: grid; gap: 18px; }
+    .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 22px; }
+    .story { grid-template-columns: 1.25fr .75fr; margin-bottom: 22px; }
+    .two { grid-template-columns: 1.18fr .82fr; margin-bottom: 18px; }
+    .stack { grid-template-columns: 1fr; margin-bottom: 18px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid rgba(220,235,228,.95);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      backdrop-filter: blur(8px);
+    }
+    .kpi-card {
+      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(245,252,248,.95));
+    }
+    .kpi-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 700;
+    }
+    .kpi-value {
+      font-size: 34px;
+      line-height: 1;
+      font-weight: 800;
+      margin-top: 12px;
+      letter-spacing: -.03em;
+    }
+    .kpi-sub {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+    .section-title {
+      font-size: 24px;
+      line-height: 1.15;
+      letter-spacing: -.03em;
+      margin-bottom: 10px;
+    }
+    .section-copy, .small, .footer {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .small { font-size: 13px; margin-top: 12px; }
+    .story-points {
+      display: grid;
+      gap: 14px;
+      margin-top: 16px;
+    }
+    .point {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(246,251,248,.95), rgba(255,255,255,.98));
+      border: 1px solid var(--line);
+    }
+    .point strong { display: block; margin-bottom: 6px; }
+    .analysis {
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .analysis h2, .analysis h3 {
+      margin: 0 0 10px;
+      letter-spacing: -.02em;
+      line-height: 1.2;
+    }
+    .analysis h2 { font-size: 22px; }
+    .analysis h3 { font-size: 17px; margin-top: 18px; }
+    .analysis p { margin: 0 0 12px; }
+    .analysis ul { margin: 0 0 14px 18px; padding: 0; }
+    .analysis li { margin: 0 0 8px; }
+    .analysis strong { color: #0d5f5b; }
+    .table-wrap { overflow: auto; border-radius: 16px; border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.9); }
+    th, td {
+      text-align: left;
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+    }
+    th {
+      background: #f2faf6;
+      color: #44685f;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      position: sticky;
+      top: 0;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .footer {
+      font-size: 12px;
+      padding: 4px 4px 18px;
+    }
+    @media (max-width: 1080px) {
+      .kpis, .story, .two { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .wrap { padding: 16px; }
+      .hero, .card { padding: 18px; }
+      .kpi-value { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="eyebrow">Indonesia credit card story</div>
+      <h1>Indonesia’s credit card market kept expanding nationally — but regional momentum split sharply between Jakarta and Bali.</h1>
+      <p class="lead">The national market shows durable long-term growth in cards, transaction volume, and spending value. But beneath that steady national story, the regional picture diverges: DKI Jakarta intensified usage while Bali’s transaction activity weakened materially.</p>
+      <div class="meta-row">
+        <div class="meta-pill">Coverage: 2009-01 → 2025-11</div>
+        <div class="meta-pill">Latest snapshot: Nov 2025</div>
+        <div class="meta-pill">Source: Bank Indonesia SPIP Table 5d</div>
+        <div class="meta-pill">Dataset: Indonesia-Credit-Card-by-Region-WIDE.xlsx</div>
+      </div>
+    </section>
+
+    <section class="grid kpis">
+      <div class="card kpi-card"><div class="kpi-label">Cards in circulation</div><div class="kpi-value">18.73M</div><div class="kpi-sub">Up 62.0% since 2009, with growth now moderating to a 1.2% YoY pace.</div></div>
+      <div class="card kpi-card"><div class="kpi-label">Transaction volume</div><div class="kpi-value">44.73M</div><div class="kpi-sub">The strongest usage signal: +211.1% since 2009 and +12.3% YoY in the latest snapshot.</div></div>
+      <div class="card kpi-card"><div class="kpi-label">Transaction value</div><div class="kpi-value">Rp 41.4T</div><div class="kpi-sub">Value grew fastest overall at +326.7%, showing deeper spending intensity over time.</div></div>
+      <div class="card kpi-card"><div class="kpi-label">Peak seasonal month</div><div class="kpi-value">December</div><div class="kpi-sub">Average activity peaks at 27.05M transactions and Rp 25.9T in spending.</div></div>
+    </section>
+
+    <section class="grid story">
+      <div class="card">
+        <h2 class="section-title">The story in one glance</h2>
+        <p class="section-copy">Three ideas explain most of what matters in this dataset.</p>
+        <div class="story-points">
+          <div class="point"><strong>1. National growth stayed intact.</strong> Indonesia added more cards over time, but transaction volume and spending value grew even faster than card count.</div>
+          <div class="point"><strong>2. Usage intensity is doing the heavy lifting.</strong> Recent growth is being driven less by new card issuance and more by existing cardholders using cards more often and for higher-value spend.</div>
+          <div class="point"><strong>3. Regional outcomes are not uniform.</strong> Jakarta looks like a maturing, high-throughput market, while Bali shows a weaker transaction recovery despite an expanding card base.</div>
+        </div>
+      </div>
+      <div class="card">
+        <h2 class="section-title">Why this matters</h2>
+        <p class="section-copy">If you were building a strategy on top of this market, the national story says “growth is real,” but the regional story says “deployment needs to be selective.”</p>
+        <div class="story-points">
+          <div class="point"><strong>For market sizing</strong> — national transaction value is still compounding meaningfully.</div>
+          <div class="point"><strong>For go-to-market</strong> — high-usage metros may outperform card-growth regions.</div>
+          <div class="point"><strong>For timing</strong> — December matters disproportionately, while February is consistently softer.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid stack">
+      <div class="card">
+        <h2 class="section-title">National market trend</h2>
+        <p class="section-copy">Cards grew steadily, but transaction volume and transaction value accelerated more strongly — especially after the pandemic recovery.</p>
+        <div id="trendChart" style="height:500px"></div>
+        <div class="small">Source: Spectra chart data from the executive summary query.</div>
+      </div>
+      <div class="card">
+        <h2 class="section-title">Spectra executive summary</h2>
+        <div id="executiveAnalysis" class="analysis"></div>
+      </div>
+    </section>
+
+    <section class="grid two">
+      <div class="card">
+        <h2 class="section-title">Seasonality across the national series</h2>
+        <p class="section-copy">Average monthly behavior shows a clear year-end lift, with December strongest and February the softest month.</p>
+        <div id="seasonalityChart" style="height:430px"></div>
+        <div class="small">Based on national <em>Total</em> rows across all available years.</div>
+      </div>
+      <div class="card">
+        <h2 class="section-title">Average month table</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Month</th><th>Avg Txn Volume (M)</th><th>Avg Txn Value (Rp B)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Jan</td><td>25.03</td><td>22,841.90</td></tr>
+              <tr><td>Feb</td><td>23.09</td><td>20,994.13</td></tr>
+              <tr><td>Mar</td><td>25.36</td><td>23,673.89</td></tr>
+              <tr><td>Apr</td><td>24.35</td><td>22,229.86</td></tr>
+              <tr><td>May</td><td>25.11</td><td>23,201.82</td></tr>
+              <tr><td>Jun</td><td>24.97</td><td>23,124.39</td></tr>
+              <tr><td>Jul</td><td>25.82</td><td>23,977.09</td></tr>
+              <tr><td>Aug</td><td>25.55</td><td>23,561.32</td></tr>
+              <tr><td>Sep</td><td>24.94</td><td>23,085.92</td></tr>
+              <tr><td>Oct</td><td>25.88</td><td>24,075.54</td></tr>
+              <tr><td>Nov</td><td>26.03</td><td>24,250.90</td></tr>
+              <tr><td>Dec</td><td>27.05</td><td>25,944.23</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid two">
+      <div class="card">
+        <h2 class="section-title">Jakarta vs Bali: same country, very different momentum</h2>
+        <p class="section-copy">This comparison highlights the divergence between a maturing metropolitan market and a weaker regional transaction recovery.</p>
+        <div id="regionalChart" style="height:470px"></div>
+        <div class="small">Built from the validated Jakarta vs Bali comparison already produced earlier in this thread.</div>
+      </div>
+      <div class="card">
+        <h2 class="section-title">Spectra regional analysis</h2>
+        <div id="regionalAnalysis" class="analysis"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">Scope note</h2>
+      <div class="analysis">
+        <p>This revamp keeps the same validated data and findings from the original run. I did <strong>not</strong> pull new Spectra queries.</p>
+        <p>Some broader province-ranking outputs were malformed during the earlier run, so they remain intentionally excluded here rather than shown with low confidence.</p>
+      </div>
+    </section>
+
+    <div class="footer">Spectra-sourced narrative is preserved, but now rendered as HTML for readability. Dashboard design and layout were refreshed on 2026-05-04.</div>
+  </div>
+
+  <script>
+    const executiveMarkdown = `## Executive Summary: Indonesia's National Credit Card Market (2009–2025)
+
+Indonesia's credit card market has experienced robust long-term growth over the 16-year period from January 2009 to November 2025, with 203 monthly data points tracked.
+
+### Key Growth Metrics
+
+**Cards in Circulation:**
+- Grew from 11.6 million (Jan 2009) to 18.7 million (Nov 2025)
+- Total growth: **62%** over 16 years
+- CAGR: **3.1%** annually
+- YoY growth (latest): **1.2%**
+
+**Transaction Volume:**
+- Surged from 14.4 million transactions (Jan 2009) to 44.7 million (Nov 2025)
+- Total growth: **211%** — the strongest performer
+- CAGR: **7.3%** annually
+- YoY growth (latest): **12.3%**
+
+**Transaction Value:**
+- Increased from 9.7 trillion IDR (Jan 2009) to 41.4 trillion IDR (Nov 2025)
+- Total growth: **327%** — exceptional expansion
+- CAGR: **9.5%** annually
+- YoY growth (latest): **13.4%**
+
+### Major Inflection Points
+
+The data reveals consistent seasonal volatility, particularly around year-end (December) when transaction volume and value spike 15–25%. Early 2009–2010 showed elevated month-over-month swings (15–25% in volume), suggesting market stabilization during the post-financial crisis period. The 2020 COVID-19 pandemic caused a sharp contraction in April–May 2020 (transaction volume dropped ~30%), but recovery was swift by mid-2020.
+
+### Latest Snapshot (November 2025)
+
+The market remains in a strong growth phase with double-digit YoY increases in both transaction volume and value, though card circulation growth has moderated to single digits. This suggests deepening usage intensity among existing cardholders rather than rapid new customer acquisition.
+
+### Key Insight
+
+Transaction value growth (9.5% CAGR) significantly outpaces card circulation growth (3.1% CAGR), indicating rising average transaction values—likely driven by inflation, increased consumer spending power, and broader digital payment adoption.`;
+
+    const regionalMarkdown = `## Growth Analysis: DKI Jakarta vs Bali (Sept 2018 - Nov 2025)
+
+**DKI Jakarta** shows strong transaction growth despite declining card circulation:
+- **Cards in Circulation**: Decreased 12.22% (6.61M → 5.80M)
+- **Transaction Volume**: Surged 97.35% (12.86M → 25.38M)
+- **Transaction Value**: Nearly doubled at 102.7% growth (Rp 11.17T → Rp 22.63T)
+This suggests fewer cards are handling significantly more transactions—indicating increased card usage intensity and higher transaction values per card.
+
+**Bali** presents a contrasting trend with mixed results:
+- **Cards in Circulation**: Grew 21.04% (0.36M → 0.43M)
+- **Transaction Volume**: Declined sharply 46.67% (1.57M → 0.84M)
+- **Transaction Value**: Plummeted 69.9% (Rp 2.52T → Rp 0.76T)
+Despite card growth, Bali experienced significant transaction contraction, suggesting reduced card usage frequency and lower transaction values—potentially reflecting post-pandemic tourism impacts or economic shifts.
+
+**Key Insight**: DKI Jakarta demonstrates healthy digital payment ecosystem maturation with efficiency gains, while Bali shows concerning transaction decline despite card base expansion.`;
+
+    function inlineMarkdown(text) {
+      return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+    }
+
+    function markdownToHtml(md) {
+      const lines = md.split(/\n/);
+      let html = '';
+      let inList = false;
+      let paragraph = [];
+
+      function flushParagraph() {
+        if (paragraph.length) {
+          html += `<p>${inlineMarkdown(paragraph.join(' '))}</p>`;
+          paragraph = [];
+        }
+      }
+
+      function closeList() {
+        if (inList) {
+          html += '</ul>';
+          inList = false;
+        }
+      }
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) {
+          flushParagraph();
+          closeList();
+          continue;
+        }
+        if (line.startsWith('## ')) {
+          flushParagraph();
+          closeList();
+          html += `<h2>${inlineMarkdown(line.slice(3))}</h2>`;
+          continue;
+        }
+        if (line.startsWith('### ')) {
+          flushParagraph();
+          closeList();
+          html += `<h3>${inlineMarkdown(line.slice(4))}</h3>`;
+          continue;
+        }
+        if (line.startsWith('- ')) {
+          flushParagraph();
+          if (!inList) {
+            html += '<ul>';
+            inList = true;
+          }
+          html += `<li>${inlineMarkdown(line.slice(2))}</li>`;
+          continue;
+        }
+        paragraph.push(line);
+      }
+      flushParagraph();
+      closeList();
+      return html;
+    }
+
+    document.getElementById('executiveAnalysis').innerHTML = markdownToHtml(executiveMarkdown);
+    document.getElementById('regionalAnalysis').innerHTML = markdownToHtml(regionalMarkdown);
+
+    const national = [{"YearMonth": "2009-01", "Cards_Millions": 11.562572, "Volume_Millions": 14.380334, "Value_Billions_IDR": 9701.247843044}, {"YearMonth": "2009-02", "Cards_Millions": 11.552233, "Volume_Millions": 13.117527, "Value_Billions_IDR": 9070.451926559}, {"YearMonth": "2009-03", "Cards_Millions": 11.715461, "Volume_Millions": 15.108508, "Value_Billions_IDR": 10816.020573548}, {"YearMonth": "2009-04", "Cards_Millions": 11.671304, "Volume_Millions": 14.535692, "Value_Billions_IDR": 10533.313565276}, {"YearMonth": "2009-05", "Cards_Millions": 11.686889, "Volume_Millions": 14.635759, "Value_Billions_IDR": 10817.388822325}, {"YearMonth": "2009-06", "Cards_Millions": 11.783091, "Volume_Millions": 16.040945, "Value_Billions_IDR": 12107.114600345}, {"YearMonth": "2009-07", "Cards_Millions": 11.884015, "Volume_Millions": 16.031168, "Value_Billions_IDR": 12230.039435786}, {"YearMonth": "2009-08", "Cards_Millions": 12.001107, "Volume_Millions": 15.308027, "Value_Billions_IDR": 11631.101974082}, {"YearMonth": "2009-09", "Cards_Millions": 12.08491, "Volume_Millions": 15.933288, "Value_Billions_IDR": 11980.047598454}, {"YearMonth": "2009-10", "Cards_Millions": 12.130413, "Volume_Millions": 15.005702, "Value_Billions_IDR": 12047.493362565}, {"YearMonth": "2009-11", "Cards_Millions": 12.161819, "Volume_Millions": 15.019539, "Value_Billions_IDR": 11678.537613127}, {"YearMonth": "2009-12", "Cards_Millions": 12.259295, "Volume_Millions": 17.508233, "Value_Billions_IDR": 14079.106858855}, {"YearMonth": "2010-01", "Cards_Millions": 12.300122, "Volume_Millions": 15.172161, "Value_Billions_IDR": 11969.883056647}, {"YearMonth": "2010-02", "Cards_Millions": 12.402707, "Volume_Millions": 14.689958, "Value_Billions_IDR": 11269.850816567}, {"YearMonth": "2010-03", "Cards_Millions": 12.519221, "Volume_Millions": 17.29707, "Value_Billions_IDR": 14071.855421516}, {"YearMonth": "2010-04", "Cards_Millions": 12.613314, "Volume_Millions": 16.00225, "Value_Billions_IDR": 12838.672777263}, {"YearMonth": "2010-05", "Cards_Millions": 12.612545, "Volume_Millions": 16.32417, "Value_Billions_IDR": 13110.565588064}, {"YearMonth": "2010-06", "Cards_Millions": 12.752457, "Volume_Millions": 16.602206, "Value_Billions_IDR": 13616.3620285}, {"YearMonth": "2010-07", "Cards_Millions": 12.834775, "Volume_Millions": 17.053677, "Value_Billions_IDR": 13915.954994645}, {"YearMonth": "2010-08", "Cards_Millions": 12.988388, "Volume_Millions": 17.450105, "Value_Billions_IDR": 14198.506622038}, {"YearMonth": "2010-09", "Cards_Millions": 13.057186, "Volume_Millions": 16.750052, "Value_Billions_IDR": 13894.979463247}, {"YearMonth": "2010-10", "Cards_Millions": 13.220119, "Volume_Millions": 16.202832, "Value_Billions_IDR": 13882.17180233}, {"YearMonth": "2010-11", "Cards_Millions": 13.381774, "Volume_Millions": 17.003107, "Value_Billions_IDR": 14447.667772742}, {"YearMonth": "2010-12", "Cards_Millions": 13.574673, "Volume_Millions": 18.488839, "Value_Billions_IDR": 15992.020598124}, {"YearMonth": "2011-01", "Cards_Millions": 13.51302, "Volume_Millions": 16.762695, "Value_Billions_IDR": 13987.361632534}, {"YearMonth": "2011-02", "Cards_Millions": 13.803196, "Volume_Millions": 16.200693, "Value_Billions_IDR": 13285.508970406}, {"YearMonth": "2011-03", "Cards_Millions": 13.9191, "Volume_Millions": 17.855108, "Value_Billions_IDR": 15671.756323111}, {"YearMonth": "2011-04", "Cards_Millions": 14.019372, "Volume_Millions": 16.684982, "Value_Billions_IDR": 14147.596591597}, {"YearMonth": "2011-05", "Cards_Millions": 14.16219, "Volume_Millions": 17.763689, "Value_Billions_IDR": 15587.702898505}, {"YearMonth": "2011-06", "Cards_Millions": 14.243048, "Volume_Millions": 17.294008, "Value_Billions_IDR": 15330.859805976}, {"YearMonth": "2011-07", "Cards_Millions": 14.379802, "Volume_Millions": 17.518731, "Value_Billions_IDR": 16270.860916914}, {"YearMonth": "2011-08", "Cards_Millions": 14.166928, "Volume_Millions": 17.730187, "Value_Billions_IDR": 15350.75470872}, {"YearMonth": "2011-09", "Cards_Millions": 14.273168, "Volume_Millions": 17.576257, "Value_Billions_IDR": 15203.421370116}, {"YearMonth": "2011-10", "Cards_Millions": 14.438324, "Volume_Millions": 17.450588, "Value_Billions_IDR": 15044.695344451}, {"YearMonth": "2011-11", "Cards_Millions": 14.594689, "Volume_Millions": 17.797367, "Value_Billions_IDR": 15719.078322761}, {"YearMonth": "2011-12", "Cards_Millions": 14.785382, "Volume_Millions": 18.717892, "Value_Billions_IDR": 17002.734148689}, {"YearMonth": "2012-01", "Cards_Millions": 14.474565, "Volume_Millions": 18.45986, "Value_Billions_IDR": 15860.208464229}, {"YearMonth": "2012-02", "Cards_Millions": 14.581468, "Volume_Millions": 17.075248, "Value_Billions_IDR": 15144.535051868}, {"YearMonth": "2012-03", "Cards_Millions": 14.746354, "Volume_Millions": 18.163942, "Value_Billions_IDR": 16406.120723644}, {"YearMonth": "2012-04", "Cards_Millions": 14.896858, "Volume_Millions": 17.778804, "Value_Billions_IDR": 15837.019271274}, {"YearMonth": "2012-05", "Cards_Millions": 15.065898, "Volume_Millions": 19.091264, "Value_Billions_IDR": 17514.530984043}, {"YearMonth": "2012-06", "Cards_Millions": 15.285814, "Volume_Millions": 18.238052, "Value_Billions_IDR": 16887.409492624}, {"YearMonth": "2012-07", "Cards_Millions": 15.310554, "Volume_Millions": 19.614022, "Value_Billions_IDR": 18384.785521571}, {"YearMonth": "2012-08", "Cards_Millions": 15.428027, "Volume_Millions": 19.065017, "Value_Billions_IDR": 17174.020012043}, {"YearMonth": "2012-09", "Cards_Millions": 15.590119, "Volume_Millions": 17.306708, "Value_Billions_IDR": 16160.47614651}, {"YearMonth": "2012-10", "Cards_Millions": 15.7556635910359, "Volume_Millions": 17.9711153236674, "Value_Billions_IDR": 17192.5022243145}, {"YearMonth": "2012-11", "Cards_Millions": 14.61743, "Volume_Millions": 18.7481689299899, "Value_Billions_IDR": 16722.5608196754}, {"YearMonth": "2012-12", "Cards_Millions": 14.817168, "Volume_Millions": 20.06765, "Value_Billions_IDR": 18556.567041144}, {"YearMonth": "2013-01", "Cards_Millions": 14.591371, "Volume_Millions": 20.021962, "Value_Billions_IDR": 17960.041669876}, {"YearMonth": "2013-02", "Cards_Millions": 14.616755, "Volume_Millions": 17.787392, "Value_Billions_IDR": 15902.691917815}, {"YearMonth": "2013-03", "Cards_Millions": 14.601113, "Volume_Millions": 18.858114, "Value_Billions_IDR": 17573.945665367}, {"YearMonth": "2013-04", "Cards_Millions": 14.644937, "Volume_Millions": 20.175308, "Value_Billions_IDR": 18406.616713353}, {"YearMonth": "2013-05", "Cards_Millions": 14.666101, "Volume_Millions": 19.791137, "Value_Billions_IDR": 18641.736961456}, {"YearMonth": "2013-06", "Cards_Millions": 14.702331, "Volume_Millions": 19.5913, "Value_Billions_IDR": 18182.41355529}, {"YearMonth": "2013-07", "Cards_Millions": 14.760376, "Volume_Millions": 22.14482, "Value_Billions_IDR": 21001.353547446}, {"YearMonth": "2013-08", "Cards_Millions": 14.749024, "Volume_Millions": 20.160455, "Value_Billions_IDR": 18173.933077876}, {"YearMonth": "2013-09", "Cards_Millions": 14.798425, "Volume_Millions": 19.024145, "Value_Billions_IDR": 17909.467523226}, {"YearMonth": "2013-10", "Cards_Millions": 14.888694, "Volume_Millions": 20.367898, "Value_Billions_IDR": 19482.281374343}, {"YearMonth": "2013-11", "Cards_Millions": 15.007492, "Volume_Millions": 19.369525, "Value_Billions_IDR": 18894.090607985}, {"YearMonth": "2013-12", "Cards_Millions": 15.091684, "Volume_Millions": 21.806463, "Value_Billions_IDR": 21241.0045196}, {"YearMonth": "2014-01", "Cards_Millions": 15.124109, "Volume_Millions": 20.691087, "Value_Billions_IDR": 19645.616829884}, {"YearMonth": "2014-02", "Cards_Millions": 15.150829, "Volume_Millions": 18.599909, "Value_Billions_IDR": 17621.560811837}, {"YearMonth": "2014-03", "Cards_Millions": 15.100335, "Volume_Millions": 19.869261, "Value_Billions_IDR": 19587.334511441}, {"YearMonth": "2014-04", "Cards_Millions": 15.211565, "Volume_Millions": 21.440256, "Value_Billions_IDR": 20724.132646795}, {"YearMonth": "2014-05", "Cards_Millions": 15.280906, "Volume_Millions": 21.11234, "Value_Billions_IDR": 21182.725188577}, {"YearMonth": "2014-06", "Cards_Millions": 15.428664, "Volume_Millions": 21.688751, "Value_Billions_IDR": 21739.23849375}, {"YearMonth": "2014-07", "Cards_Millions": 15.552463, "Volume_Millions": 21.569452, "Value_Billions_IDR": 21653.076153951}, {"YearMonth": "2014-08", "Cards_Millions": 15.665796, "Volume_Millions": 21.339647, "Value_Billions_IDR": 21535.929343672}, {"YearMonth": "2014-09", "Cards_Millions": 15.819398, "Volume_Millions": 21.327553, "Value_Billions_IDR": 21921.36519469}, {"YearMonth": "2014-10", "Cards_Millions": 15.902962, "Volume_Millions": 21.693092, "Value_Billions_IDR": 22588.678951529}, {"YearMonth": "2014-11", "Cards_Millions": 15.979352, "Volume_Millions": 20.523736, "Value_Billions_IDR": 21368.248874069}, {"YearMonth": "2014-12", "Cards_Millions": 16.043347, "Volume_Millions": 24.464977, "Value_Billions_IDR": 25489.550694811}, {"YearMonth": "2015-01", "Cards_Millions": 16.04527, "Volume_Millions": 21.511103, "Value_Billions_IDR": 21596.043454985}, {"YearMonth": "2015-02", "Cards_Millions": 16.065029, "Volume_Millions": 20.85475, "Value_Billions_IDR": 20398.515229096}, {"YearMonth": "2015-03", "Cards_Millions": 16.110742, "Volume_Millions": 23.29659, "Value_Billions_IDR": 24023.249751746}, {"YearMonth": "2015-04", "Cards_Millions": 16.183622, "Volume_Millions": 22.762468, "Value_Billions_IDR": 22964.26930897}, {"YearMonth": "2015-05", "Cards_Millions": 16.226878, "Volume_Millions": 23.083918, "Value_Billions_IDR": 23556.508689178}, {"YearMonth": "2015-06", "Cards_Millions": 16.621918, "Volume_Millions": 24.440007, "Value_Billions_IDR": 24624.549282317}, {"YearMonth": "2015-07", "Cards_Millions": 16.655162, "Volume_Millions": 24.83151, "Value_Billions_IDR": 24664.075596913}, {"YearMonth": "2015-08", "Cards_Millions": 16.7096, "Volume_Millions": 23.158677, "Value_Billions_IDR": 23004.248982844}, {"YearMonth": "2015-09", "Cards_Millions": 16.741789, "Volume_Millions": 23.1895, "Value_Billions_IDR": 22880.065852429}, {"YearMonth": "2015-10", "Cards_Millions": 16.750971, "Volume_Millions": 23.608206, "Value_Billions_IDR": 23184.874081158}, {"YearMonth": "2015-11", "Cards_Millions": 16.813855, "Volume_Millions": 23.78409, "Value_Billions_IDR": 23070.719654055}, {"YearMonth": "2015-12", "Cards_Millions": 16.863842, "Volume_Millions": 26.805021, "Value_Billions_IDR": 26576.810478223}, {"YearMonth": "2016-01", "Cards_Millions": 16.878261, "Volume_Millions": 23.995879, "Value_Billions_IDR": 22927.12776392}, {"YearMonth": "2016-02", "Cards_Millions": 16.942073, "Volume_Millions": 24.172068, "Value_Billions_IDR": 22154.169805091}, {"YearMonth": "2016-03", "Cards_Millions": 16.892592, "Volume_Millions": 25.841291, "Value_Billions_IDR": 24775.878263685}, {"YearMonth": "2016-04", "Cards_Millions": 16.896126, "Volume_Millions": 23.676732, "Value_Billions_IDR": 22148.265959511}, {"YearMonth": "2016-05", "Cards_Millions": 16.918991, "Volume_Millions": 25.794701, "Value_Billions_IDR": 23761.896794755}, {"YearMonth": "2016-06", "Cards_Millions": 16.970178, "Volume_Millions": 25.735683, "Value_Billions_IDR": 23931.455285607}, {"YearMonth": "2016-07", "Cards_Millions": 16.998701, "Volume_Millions": 24.441255, "Value_Billions_IDR": 21563.986651031}, {"YearMonth": "2016-08", "Cards_Millions": 17.033436, "Volume_Millions": 26.161648, "Value_Billions_IDR": 23750.626592278}, {"YearMonth": "2016-09", "Cards_Millions": 17.111653, "Volume_Millions": 24.743153, "Value_Billions_IDR": 22387.793167571}, {"YearMonth": "2016-10", "Cards_Millions": 17.229402, "Volume_Millions": 25.79811, "Value_Billions_IDR": 23502.838458845}, {"YearMonth": "2016-11", "Cards_Millions": 17.351826, "Volume_Millions": 26.34225, "Value_Billions_IDR": 23745.48140367}, {"YearMonth": "2016-12", "Cards_Millions": 17.406327, "Volume_Millions": 28.349527, "Value_Billions_IDR": 26370.997531819}, {"YearMonth": "2017-01", "Cards_Millions": 17.494198, "Volume_Millions": 27.459845, "Value_Billions_IDR": 24169.242799462}, {"YearMonth": "2017-02", "Cards_Millions": 17.528716, "Volume_Millions": 25.427736, "Value_Billions_IDR": 22187.309206952}, {"YearMonth": "2017-03", "Cards_Millions": 17.59243, "Volume_Millions": 27.853985, "Value_Billions_IDR": 25655.442374603}, {"YearMonth": "2017-04", "Cards_Millions": 17.661935, "Volume_Millions": 26.704833, "Value_Billions_IDR": 23410.045733778}, {"YearMonth": "2017-05", "Cards_Millions": 17.21139, "Volume_Millions": 28.439085, "Value_Billions_IDR": 25827.492327885}, {"YearMonth": "2017-06", "Cards_Millions": 16.771865, "Volume_Millions": 26.466534, "Value_Billions_IDR": 24495.991109373}, {"YearMonth": "2017-07", "Cards_Millions": 16.855817, "Volume_Millions": 26.935758, "Value_Billions_IDR": 25158.274803876}, {"YearMonth": "2017-08", "Cards_Millions": 16.899174, "Volume_Millions": 27.017216, "Value_Billions_IDR": 25100.379779881}, {"YearMonth": "2017-09", "Cards_Millions": 16.905319, "Volume_Millions": 25.950524, "Value_Billions_IDR": 23707.169088677}, {"YearMonth": "2017-10", "Cards_Millions": 16.922296, "Volume_Millions": 28.225843, "Value_Billions_IDR": 25555.741012477}, {"YearMonth": "2017-11", "Cards_Millions": 17.079966, "Volume_Millions": 27.672147, "Value_Billions_IDR": 25266.554411412}, {"YearMonth": "2017-12", "Cards_Millions": 17.244127, "Volume_Millions": 29.224159, "Value_Billions_IDR": 27227.586834925}, {"YearMonth": "2018-01", "Cards_Millions": 17.400189, "Volume_Millions": 28.974356, "Value_Billions_IDR": 26157.886299423}, {"YearMonth": "2018-02", "Cards_Millions": 17.438938, "Volume_Millions": 25.112361, "Value_Billions_IDR": 21663.990157659}, {"YearMonth": "2018-03", "Cards_Millions": 17.396248, "Volume_Millions": 27.977532, "Value_Billions_IDR": 25550.787935401}, {"YearMonth": "2018-04", "Cards_Millions": 17.418527, "Volume_Millions": 28.338644, "Value_Billions_IDR": 25674.094009924}, {"YearMonth": "2018-05", "Cards_Millions": 17.268459, "Volume_Millions": 29.300375, "Value_Billions_IDR": 27036.978712333}, {"YearMonth": "2018-06", "Cards_Millions": 17.249578, "Volume_Millions": 27.667099, "Value_Billions_IDR": 25402.397650774}, {"YearMonth": "2018-07", "Cards_Millions": 17.27096, "Volume_Millions": 28.314934, "Value_Billions_IDR": 26737.770586305}, {"YearMonth": "2018-08", "Cards_Millions": 17.280602, "Volume_Millions": 27.581814, "Value_Billions_IDR": 26172.037220108}, {"YearMonth": "2018-09", "Cards_Millions": 17.224684, "Volume_Millions": 26.274567, "Value_Billions_IDR": 24382.543889885}, {"YearMonth": "2018-10", "Cards_Millions": 17.262472, "Volume_Millions": 29.679965, "Value_Billions_IDR": 28035.289332507}, {"YearMonth": "2018-11", "Cards_Millions": 17.241722, "Volume_Millions": 28.484027, "Value_Billions_IDR": 27250.855656396}, {"YearMonth": "2018-12", "Cards_Millions": 17.275128, "Volume_Millions": 30.642193, "Value_Billions_IDR": 30229.435524934}, {"YearMonth": "2019-01", "Cards_Millions": 17.118065, "Volume_Millions": 29.012562, "Value_Billions_IDR": 28023.385247701}, {"YearMonth": "2019-02", "Cards_Millions": 17.15394, "Volume_Millions": 26.449509, "Value_Billions_IDR": 25815.999530444}, {"YearMonth": "2019-03", "Cards_Millions": 17.184306, "Volume_Millions": 28.230128, "Value_Billions_IDR": 28090.12727502}, {"YearMonth": "2019-04", "Cards_Millions": 17.201494, "Volume_Millions": 29.120241, "Value_Billions_IDR": 27784.966144441}, {"YearMonth": "2019-05", "Cards_Millions": 17.199903, "Volume_Millions": 29.354916, "Value_Billions_IDR": 30452.8585988}, {"YearMonth": "2019-06", "Cards_Millions": 17.216047, "Volume_Millions": 27.120802, "Value_Billions_IDR": 25907.896266}, {"YearMonth": "2019-07", "Cards_Millions": 17.273927, "Volume_Millions": 30.346213, "Value_Billions_IDR": 29863.5170626}, {"YearMonth": "2019-08", "Cards_Millions": 17.302241, "Volume_Millions": 28.479509, "Value_Billions_IDR": 28240.8679021}, {"YearMonth": "2019-09", "Cards_Millions": 17.346812, "Volume_Millions": 28.539329, "Value_Billions_IDR": 27671.6734207}, {"YearMonth": "2019-10", "Cards_Millions": 17.36904, "Volume_Millions": 30.157363, "Value_Billions_IDR": 29301.3448937}, {"YearMonth": "2019-11", "Cards_Millions": 17.383244, "Volume_Millions": 29.676232, "Value_Billions_IDR": 28699.8498652}, {"YearMonth": "2019-12", "Cards_Millions": 17.487057, "Volume_Millions": 32.725116, "Value_Billions_IDR": 32830.341804}, {"YearMonth": "2020-01", "Cards_Millions": 17.538911, "Volume_Millions": 29.984987, "Value_Billions_IDR": 28590.7930207}, {"YearMonth": "2020-02", "Cards_Millions": 17.613455, "Volume_Millions": 27.379481, "Value_Billions_IDR": 25869.9562784}, {"YearMonth": "2020-03", "Cards_Millions": 17.603573, "Volume_Millions": 27.168333, "Value_Billions_IDR": 24158.1657222}, {"YearMonth": "2020-04", "Cards_Millions": 17.783248, "Volume_Millions": 19.364889, "Value_Billions_IDR": 15962.6134701}, {"YearMonth": "2020-05", "Cards_Millions": 17.469264, "Volume_Millions": 18.601624, "Value_Billions_IDR": 15088.735839}, {"YearMonth": "2020-06", "Cards_Millions": 17.321671, "Volume_Millions": 20.89031, "Value_Billions_IDR": 17101.8039173}, {"YearMonth": "2020-07", "Cards_Millions": 17.18995, "Volume_Millions": 21.561749, "Value_Billions_IDR": 18070.3592979}, {"YearMonth": "2020-08", "Cards_Millions": 17.20286, "Volume_Millions": 22.49485, "Value_Billions_IDR": 18236.8053607}, {"YearMonth": "2020-09", "Cards_Millions": 17.021557, "Volume_Millions": 20.345622, "Value_Billions_IDR": 17527.2389088}, {"YearMonth": "2020-10", "Cards_Millions": 16.951496, "Volume_Millions": 20.266879, "Value_Billions_IDR": 17212.000798}, {"YearMonth": "2020-11", "Cards_Millions": 16.945952, "Volume_Millions": 23.027926, "Value_Billions_IDR": 19893.39477}, {"YearMonth": "2020-12", "Cards_Millions": 16.94004, "Volume_Millions": 23.595782, "Value_Billions_IDR": 21191.7411958}, {"YearMonth": "2021-01", "Cards_Millions": 16.836892, "Volume_Millions": 21.367825, "Value_Billions_IDR": 18219.7703421}, {"YearMonth": "2021-02", "Cards_Millions": 16.796543, "Volume_Millions": 20.542765, "Value_Billions_IDR": 17197.7255765}, {"YearMonth": "2021-03", "Cards_Millions": 16.761663, "Volume_Millions": 24.315456, "Value_Billions_IDR": 21434.9785169}, {"YearMonth": "2021-04", "Cards_Millions": 16.713107, "Volume_Millions": 23.250939, "Value_Billions_IDR": 20028.5233266}, {"YearMonth": "2021-05", "Cards_Millions": 16.674377, "Volume_Millions": 23.451934, "Value_Billions_IDR": 19706.9875751}, {"YearMonth": "2021-06", "Cards_Millions": 16.559576, "Volume_Millions": 23.221819, "Value_Billions_IDR": 19811.44846}, {"YearMonth": "2021-07", "Cards_Millions": 17.17738, "Volume_Millions": 20.8674, "Value_Billions_IDR": 17124.4409574}, {"YearMonth": "2021-08", "Cards_Millions": 17.014797, "Volume_Millions": 22.738002, "Value_Billions_IDR": 19699.17293}, {"YearMonth": "2021-09", "Cards_Millions": 16.520839, "Volume_Millions": 23.133249, "Value_Billions_IDR": 20468.6459877}, {"YearMonth": "2021-10", "Cards_Millions": 16.545925, "Volume_Millions": 24.764344, "Value_Billions_IDR": 21428.7984873}, {"YearMonth": "2021-11", "Cards_Millions": 16.60889, "Volume_Millions": 26.389765, "Value_Billions_IDR": 23476.69877}, {"YearMonth": "2021-12", "Cards_Millions": 16.513623, "Volume_Millions": 27.857966, "Value_Billions_IDR": 25918.7933595}, {"YearMonth": "2022-01", "Cards_Millions": 16.549026, "Volume_Millions": 27.595841, "Value_Billions_IDR": 24745.638458352}, {"YearMonth": "2022-02", "Cards_Millions": 16.526544, "Volume_Millions": 24.170959, "Value_Billions_IDR": 20244.973341374}, {"YearMonth": "2022-03", "Cards_Millions": 16.54516, "Volume_Millions": 29.034372, "Value_Billions_IDR": 26319.096620749}, {"YearMonth": "2022-04", "Cards_Millions": 16.55724, "Volume_Millions": 26.687561, "Value_Billions_IDR": 25606.345578983}, {"YearMonth": "2022-05", "Cards_Millions": 16.588263, "Volume_Millions": 28.35976, "Value_Billions_IDR": 25643.878577498}, {"YearMonth": "2022-06", "Cards_Millions": 16.697988, "Volume_Millions": 27.926832, "Value_Billions_IDR": 26617.70127}, {"YearMonth": "2022-07", "Cards_Millions": 16.727698, "Volume_Millions": 28.130124, "Value_Billions_IDR": 26429.9821218}, {"YearMonth": "2022-08", "Cards_Millions": 17.058774, "Volume_Millions": 29.952766, "Value_Billions_IDR": 28377.11416}, {"YearMonth": "2022-09", "Cards_Millions": 16.888422, "Volume_Millions": 28.620417, "Value_Billions_IDR": 27823.22535}, {"YearMonth": "2022-10", "Cards_Millions": 16.958771, "Volume_Millions": 29.893452, "Value_Billions_IDR": 28339.119}, {"YearMonth": "2022-11", "Cards_Millions": 17.048868, "Volume_Millions": 30.205708, "Value_Billions_IDR": 29773.27156}, {"YearMonth": "2022-12", "Cards_Millions": 17.198882, "Volume_Millions": 32.188297, "Value_Billions_IDR": 33681.26551}, {"YearMonth": "2023-01", "Cards_Millions": 17.212966, "Volume_Millions": 32.149776, "Value_Billions_IDR": 32034.62092}, {"YearMonth": "2023-02", "Cards_Millions": 17.294419, "Volume_Millions": 29.188226, "Value_Billions_IDR": 31195.99457}, {"YearMonth": "2023-03", "Cards_Millions": 17.381097, "Volume_Millions": 32.185792, "Value_Billions_IDR": 34373.15402}, {"YearMonth": "2023-04", "Cards_Millions": 17.416384, "Volume_Millions": 30.467521, "Value_Billions_IDR": 30792.19589}, {"YearMonth": "2023-05", "Cards_Millions": 17.52, "Volume_Millions": 32.2, "Value_Billions_IDR": 32998.11}, {"YearMonth": "2023-06", "Cards_Millions": 17.585938, "Volume_Millions": 31.870823, "Value_Billions_IDR": 33670.98809882}, {"YearMonth": "2023-07", "Cards_Millions": 17.693269, "Volume_Millions": 34.529726, "Value_Billions_IDR": 36132.96537}, {"YearMonth": "2023-08", "Cards_Millions": 17.81686, "Volume_Millions": 33.87502, "Value_Billions_IDR": 34378.964285429}, {"YearMonth": "2023-09", "Cards_Millions": 17.906138, "Volume_Millions": 33.367561, "Value_Billions_IDR": 33394.443174457}, {"YearMonth": "2023-10", "Cards_Millions": 18.001708, "Volume_Millions": 33.198865, "Value_Billions_IDR": 34076.320410175}, {"YearMonth": "2023-11", "Cards_Millions": 17.865407, "Volume_Millions": 33.977398, "Value_Billions_IDR": 34364.501193872}, {"YearMonth": "2023-12", "Cards_Millions": 17.727481, "Volume_Millions": 36.609893, "Value_Billions_IDR": 37917.824045033}, {"YearMonth": "2024-01", "Cards_Millions": 17.792687, "Volume_Millions": 36.097254, "Value_Billions_IDR": 35902.487545199}, {"YearMonth": "2024-02", "Cards_Millions": 17.93535, "Volume_Millions": 34.07993, "Value_Billions_IDR": 33107.233745041}, {"YearMonth": "2024-03", "Cards_Millions": 18.127534, "Volume_Millions": 36.735337, "Value_Billions_IDR": 36122.926097371}, {"YearMonth": "2024-04", "Cards_Millions": 18.177693, "Volume_Millions": 36.359519, "Value_Billions_IDR": 34386.666653914}, {"YearMonth": "2024-05", "Cards_Millions": 17.939544, "Volume_Millions": 37.68937, "Value_Billions_IDR": 35654.111907016}, {"YearMonth": "2024-06", "Cards_Millions": 18.004527, "Volume_Millions": 37.074075, "Value_Billions_IDR": 35078.849688123}, {"YearMonth": "2024-07", "Cards_Millions": 18.158042, "Volume_Millions": 39.830879, "Value_Billions_IDR": 37194.850739391}, {"YearMonth": "2024-08", "Cards_Millions": 18.225984, "Volume_Millions": 38.850839, "Value_Billions_IDR": 37185.465364374}, {"YearMonth": "2024-09", "Cards_Millions": 18.311845, "Volume_Millions": 39.23584, "Value_Billions_IDR": 37180.9851662721}, {"YearMonth": "2024-10", "Cards_Millions": 18.431371, "Volume_Millions": 40.469626, "Value_Billions_IDR": 37151.837083924}, {"YearMonth": "2024-11", "Cards_Millions": 18.507669, "Volume_Millions": 39.841049, "Value_Billions_IDR": 36496.805649851}, {"YearMonth": "2024-12", "Cards_Millions": 18.549686, "Volume_Millions": 43.720732, "Value_Billions_IDR": 40801.9605132}, {"YearMonth": "2025-01", "Cards_Millions": 18.600361, "Volume_Millions": 41.833074, "Value_Billions_IDR": 36821.010571738}, {"YearMonth": "2025-02", "Cards_Millions": 18.61754, "Volume_Millions": 37.632879, "Value_Billions_IDR": 34769.718159579}, {"YearMonth": "2025-03", "Cards_Millions": 18.66728, "Volume_Millions": 41.271662, "Value_Billions_IDR": 37825.300018951}, {"YearMonth": "2025-04", "Cards_Millions": 18.675085, "Volume_Millions": 40.673733, "Value_Billions_IDR": 36662.227403629}, {"YearMonth": "2025-05", "Cards_Millions": 18.732644, "Volume_Millions": 41.846703, "Value_Billions_IDR": 37848.793226496}, {"YearMonth": "2025-06", "Cards_Millions": 18.800522, "Volume_Millions": 42.64289, "Value_Billions_IDR": 38608.181950963}, {"YearMonth": "2025-07", "Cards_Millions": 18.761285, "Volume_Millions": 45.134623, "Value_Billions_IDR": 41214.2100300271}, {"YearMonth": "2025-08", "Cards_Millions": 18.872446, "Volume_Millions": 42.956416, "Value_Billions_IDR": 38332.476671741}, {"YearMonth": "2025-09", "Cards_Millions": 18.770211, "Volume_Millions": 42.65394, "Value_Billions_IDR": 37967.084025934}, {"YearMonth": "2025-10", "Cards_Millions": 18.777952, "Volume_Millions": 45.225604, "Value_Billions_IDR": 41258.129179724}, {"YearMonth": "2025-11", "Cards_Millions": 18.732074, "Volume_Millions": 44.730147, "Value_Billions_IDR": 41396.972816841}];
+    const season = [{"Month": "Jan", "Avg Transaction Volume (Juta Txn)": 25.0277, "Avg Transaction Value (Rp Miliar)": 22841.9}, {"Month": "Feb", "Avg Transaction Volume (Juta Txn)": 23.0871, "Avg Transaction Value (Rp Miliar)": 20994.13}, {"Month": "Mar", "Avg Transaction Volume (Juta Txn)": 25.3566, "Avg Transaction Value (Rp Miliar)": 23673.89}, {"Month": "Apr", "Avg Transaction Volume (Juta Txn)": 24.3544, "Avg Transaction Value (Rp Miliar)": 22229.86}, {"Month": "May", "Avg Transaction Volume (Juta Txn)": 25.1083, "Avg Transaction Value (Rp Miliar)": 23201.82}, {"Month": "Jun", "Avg Transaction Volume (Juta Txn)": 24.9713, "Avg Transaction Value (Rp Miliar)": 23124.39}, {"Month": "Jul", "Avg Transaction Volume (Juta Txn)": 25.8151, "Avg Transaction Value (Rp Miliar)": 23977.09}, {"Month": "Aug", "Avg Transaction Volume (Juta Txn)": 25.5482, "Avg Transaction Value (Rp Miliar)": 23561.32}, {"Month": "Sep", "Avg Transaction Volume (Juta Txn)": 24.9395, "Avg Transaction Value (Rp Miliar)": 23085.92}, {"Month": "Oct", "Avg Transaction Volume (Juta Txn)": 25.8811, "Avg Transaction Value (Rp Miliar)": 24075.54}, {"Month": "Nov", "Avg Transaction Volume (Juta Txn)": 26.0348, "Avg Transaction Value (Rp Miliar)": 24250.9}, {"Month": "Dec", "Avg Transaction Volume (Juta Txn)": 27.0483, "Avg Transaction Value (Rp Miliar)": 25944.23}];
+    const jb = [{"region": "DKI Jakarta", "metric": "Cards Circulation", "start": 6.6077, "end": 5.8001, "growth": -12.22}, {"region": "DKI Jakarta", "metric": "Transaction Volume", "start": 12.8592, "end": 25.3779, "growth": 97.35}, {"region": "DKI Jakarta", "metric": "Transaction Value", "start": 11165.6344, "end": 22633.1212, "growth": 102.7}, {"region": "Bali", "metric": "Cards Circulation", "start": 0.3558, "end": 0.4307, "growth": 21.04}, {"region": "Bali", "metric": "Transaction Volume", "start": 1.5695, "end": 0.837, "growth": -46.67}, {"region": "Bali", "metric": "Transaction Value", "start": 2517.1398, "end": 757.58, "growth": -69.9}];
+
+    const commonLayout = {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      font: { color: '#24463d', family: 'Inter, sans-serif' },
+      margin: { l: 56, r: 62, t: 20, b: 42 },
+      hoverlabel: {
+        bgcolor: '#ffffff',
+        bordercolor: '#dcebe4',
+        font: { color: '#18322b' }
+      }
+    };
+
+    Plotly.newPlot('trendChart', [
+      { x: national.map(d => d.YearMonth), y: national.map(d => d.Cards_Millions), name: 'Cards in Circulation (M)', type: 'scatter', mode: 'lines', line: { color: '#68b4ff', width: 3 } },
+      { x: national.map(d => d.YearMonth), y: national.map(d => d.Volume_Millions), name: 'Transaction Volume (M)', type: 'scatter', mode: 'lines', line: { color: '#46b98d', width: 3 } },
+      { x: national.map(d => d.YearMonth), y: national.map(d => d.Value_Billions_IDR), name: 'Transaction Value (Rp B)', type: 'scatter', mode: 'lines', yaxis: 'y2', line: { color: '#ff8f70', width: 3 } }
+    ], {
+      ...commonLayout,
+      hovermode: 'x unified',
+      xaxis: { gridcolor: '#edf5f1', linecolor: '#dcebe4' },
+      yaxis: { title: 'Cards / Volume (M)', gridcolor: '#edf5f1', zerolinecolor: '#dcebe4' },
+      yaxis2: { title: 'Transaction Value (Rp B)', overlaying: 'y', side: 'right' },
+      legend: { orientation: 'h', y: 1.12 }
+    }, { responsive: true, displayModeBar: false });
+
+    Plotly.newPlot('seasonalityChart', [
+      { x: season.map(d => d['Month']), y: season.map(d => d['Avg Transaction Volume (Juta Txn)']), name: 'Avg Volume (M)', type: 'bar', marker: { color: '#46b98d', line: { color: '#46b98d', width: 1 } } },
+      { x: season.map(d => d['Month']), y: season.map(d => d['Avg Transaction Value (Rp Miliar)']), name: 'Avg Value (Rp B)', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', line: { color: '#f2b84b', width: 3 }, marker: { size: 8, color: '#f2b84b' } }
+    ], {
+      ...commonLayout,
+      hovermode: 'x unified',
+      xaxis: { gridcolor: '#edf5f1', linecolor: '#dcebe4' },
+      yaxis: { title: 'Avg Volume (M)', gridcolor: '#edf5f1', zerolinecolor: '#dcebe4' },
+      yaxis2: { title: 'Avg Value (Rp B)', overlaying: 'y', side: 'right' },
+      legend: { orientation: 'h', y: 1.14 }
+    }, { responsive: true, displayModeBar: false });
+
+    Plotly.newPlot('regionalChart', [
+      { x: jb.filter(d => d.region === 'DKI Jakarta').map(d => d.metric), y: jb.filter(d => d.region === 'DKI Jakarta').map(d => d.growth), name: 'DKI Jakarta growth %', type: 'bar', marker: { color: '#1f8a88', line: { color: '#1f8a88', width: 1 } }, borderRadius: 8 },
+      { x: jb.filter(d => d.region === 'Bali').map(d => d.metric), y: jb.filter(d => d.region === 'Bali').map(d => d.growth), name: 'Bali growth %', type: 'bar', marker: { color: '#ff8f70', line: { color: '#ff8f70', width: 1 } }, borderRadius: 8 }
+    ], {
+      ...commonLayout,
+      barmode: 'group',
+      xaxis: { tickangle: -8, linecolor: '#dcebe4' },
+      yaxis: { title: 'Growth %', gridcolor: '#edf5f1', zerolinecolor: '#b9d5ca' },
+      legend: { orientation: 'h', y: 1.12 }
+    }, { responsive: true, displayModeBar: false });
+  </script>
+</body>
+</html>

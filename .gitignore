@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Build / dist
+dist/
+build/
+*.egg
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Tooling session crumbs
+.gstack/
+.playwright-mcp/
+.conductor/
+
+# Debug artifacts at repo root
+/p2-playwright-full.png
+/*-playwright-*.png
+
+# Auto-generated command logs
+/2026-*-command-message*.txt
