@@ -31,9 +31,16 @@ _env = Environment(
 
 
 def build_magic_link(report_id: UUID, raw_token: str) -> str:
-    """Canonical consume URL. PLAN.md §4.7."""
+    """Canonical consume URL. PLAN.md §4.7.
+
+    Path is `/r/{id}/consume?token=` — the Next.js viewer's consume route
+    (M6.4). The legacy `/r/{id}?token=` shape no longer triggers consume
+    after the viewer move and would land the recipient on the email-entry
+    form instead of being signed in.
+    """
     return (
-        f"https://{settings.HUB_PRIMARY_DOMAIN}/r/{report_id}?token={raw_token}"
+        f"{settings.HUB_URL_SCHEME}://{settings.HUB_PRIMARY_DOMAIN}"
+        f"/r/{report_id}/consume?token={raw_token}"
     )
 
 

@@ -102,11 +102,19 @@ def _render_headers(etag: str) -> dict[str, str]:
     viewer_origin = settings.HUB_PRIMARY_DOMAIN
     return {
         "Content-Type": "text/html; charset=utf-8",
+        # Agent-authored reports often pull charting/CDN libs (Plotly,
+        # D3, Chart.js, fonts). The HTML itself is authenticated (only the
+        # iframe-JWT path serves it) and runs sandboxed in a child origin,
+        # so allowing any https: origin for script/style/font is an
+        # acceptable tradeoff. `connect-src https:` covers libs that fetch
+        # data over XHR/fetch after load.
         "Content-Security-Policy": (
             "default-src 'self'; "
             "img-src data: https:; "
-            "style-src 'unsafe-inline' 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https:; "
+            "script-src 'self' 'unsafe-inline' https:; "
+            "font-src 'self' data: https:; "
+            "connect-src 'self' https:; "
             f"frame-ancestors {viewer_origin};"
         ),
         "X-Content-Type-Options": "nosniff",
@@ -173,8 +181,8 @@ def _viewer_consume_url(report_id: UUID, raw_token: str) -> str:
     (legacy behavior preserved). The host is the viewer origin, not the
     reports iframe origin."""
     return (
-        f"https://{settings.HUB_PRIMARY_DOMAIN}/r/{report_id}/consume"
-        f"?token={raw_token}"
+        f"{settings.HUB_URL_SCHEME}://{settings.HUB_PRIMARY_DOMAIN}"
+        f"/r/{report_id}/consume?token={raw_token}"
     )
 
 

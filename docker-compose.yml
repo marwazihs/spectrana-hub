@@ -103,13 +103,32 @@ services:
       # Browser-facing hosts. The viewer (Next.js) runs on :3000 and the
       # iframe (Hub /render) runs on :8000. CSP `frame-ancestors` and the
       # M8 Host-header guard both read these values.
-      HUB_PRIMARY_DOMAIN: localhost:3000
-      HUB_REPORTS_DOMAIN: localhost:8000
-      HUB_EMAIL_FROM: "Hub Dev <dev@hub.local>"
-      HUB_EMAIL_BRAND_NAME: Hub-Dev
+      # HUB_HOSTNAME defaults to `localhost` for desktop dev. Override to the
+      # dev machine's LAN/Tailscale IP (e.g. `100.72.118.82`) in `.env` when
+      # testing from a phone or a sibling machine — all three values below
+      # (primary domain, reports domain, frontend iframe base) must match the
+      # host the browser actually loads, or CSP frame-ancestors blocks the
+      # embed and/or the iframe src resolves to the phone's own localhost.
+      # After changing `.env`, rebuild frontend so the new NEXT_PUBLIC value
+      # is baked: `docker compose up -d --build frontend hub`.
+      HUB_PRIMARY_DOMAIN: ${HUB_HOSTNAME:-localhost}:3000
+      HUB_REPORTS_DOMAIN: ${HUB_HOSTNAME:-localhost}:8000
+      # Local compose serves over http (no TLS). Override to https in prod
+      # by leaving HUB_URL_SCHEME unset (default) or setting it explicitly.
+      HUB_URL_SCHEME: ${HUB_URL_SCHEME:-http}
+      HUB_EMAIL_FROM: ${HUB_EMAIL_FROM:-Hub Dev <dev@hub.local>}
+      HUB_EMAIL_BRAND_NAME: ${HUB_EMAIL_BRAND_NAME:-Hub-Dev}
       HUB_SESSION_SECRET: dev-session-secret-not-for-prod-padded-to-32-bytes
       HUB_IFRAME_JWT_SECRET: dev-iframe-jwt-not-for-prod-padded-to-32-bytes
       HUB_MAGIC_LINK_HASH_SECRET: dev-magic-link-not-for-prod-padded-to-32-bytes
+      # SMTP. Empty SMTP_HOST → Hub silently no-ops the send (dev fallback).
+      # Populate via a .env file in the project root; Compose auto-loads it.
+      # See app/config.py:44 for defaults; .env.example for the full list.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       LOG_LEVEL: DEBUG
     depends_on:
       postgres:
@@ -133,7 +152,10 @@ services:
       args:
         # Browser sees this in the iframe `src` attribute. Must be the
         # externally-reachable host:port, not the docker service name.
-        NEXT_PUBLIC_HUB_REPORTS_DOMAIN: localhost:8000
+        # Must match HUB_REPORTS_DOMAIN above and resolve from the device
+        # the browser is on. NEXT_PUBLIC_* is baked at `next build` time
+        # via Docker build arg, so changing this needs a frontend rebuild.
+        NEXT_PUBLIC_HUB_REPORTS_DOMAIN: ${HUB_HOSTNAME:-localhost}:8000
     ports:
       - "3000:3000"
     environment:

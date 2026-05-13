@@ -74,6 +74,105 @@ case "$VIEWER_PROBE_CODE" in
   *) die "Viewer not responding at $VIEWER_URL (got $VIEWER_PROBE_CODE). Check: docker compose logs frontend" ;;
 esac
 
+# --- 1b. SMTP smoke test ---------------------------------------------------
+#
+# Compose auto-loads `.env` into the hub container's environment, so
+# SMTP_HOST/PORT/USER/PASS/STARTTLS are already set inside the container if
+# the operator populated `.env`. We mirror that locally (best-effort, just
+# for display) and then run a real connect+STARTTLS+login round-trip from
+# inside the hub container using the same aiosmtplib client the real send
+# path uses. Same library, same TLS stack — if this passes, the live send
+# path will too.
+#
+# Failure policy: if SMTP_HOST is set but the smoke test fails, tear the
+# stack down (`docker compose down`) and exit non-zero. A misconfigured
+# SMTP integration that fails silently at runtime is worse than refusing
+# to bootstrap — the human test would proceed thinking emails are wired
+# when they're not. If SMTP_HOST is empty, we continue with a warning;
+# the bootstrap script itself uses `delivery=return` and doesn't need
+# email to print a clickable link.
+
+# Compose auto-loads `.env` into each service's env at container creation.
+# We don't `source .env` in bash because values like `HUB_EMAIL_FROM=Name
+# <addr@host>` contain shell-meta characters that would error or worse.
+# Read the SMTP_HOST value as the hub container actually sees it.
+SMTP_HOST_IN_CONTAINER=$(docker compose exec -T hub printenv SMTP_HOST 2>/dev/null | tr -d '\r\n' || true)
+
+# If `.env` exists with SMTP settings but the container reports SMTP_HOST
+# empty, the container was created before .env was populated. Recreate so
+# compose re-injects the values. Detect by grepping `.env` directly (no
+# bash sourcing — avoids the shell-meta trap above).
+if [ -z "$SMTP_HOST_IN_CONTAINER" ] && [ -f .env ] && grep -qE '^[[:space:]]*SMTP_HOST=.+' .env; then
+  step "SMTP_HOST is set in .env but empty in the hub container — recreating hub"
+  docker compose up -d --force-recreate hub >/dev/null 2>&1 || die "Failed to recreate hub container"
+  for i in $(seq 1 30); do
+    if curl -fsS "$HUB_URL/healthz" >/dev/null 2>&1; then
+      ok "Hub healthy again after recreate (${i}s)"
+      break
+    fi
+    sleep 1
+    [ "$i" -eq 30 ] && die "Hub did not come back healthy after recreate"
+  done
+  SMTP_HOST_IN_CONTAINER=$(docker compose exec -T hub printenv SMTP_HOST 2>/dev/null | tr -d '\r\n' || true)
+fi
+
+if [ -z "$SMTP_HOST_IN_CONTAINER" ]; then
+  printf '%s• SMTP_HOST not configured — magic-link emails will silently no-op.%s\n' "$c_dim" "$c_off"
+  printf '%s  Populate SMTP_HOST/PORT/USER/PASS/STARTTLS in .env, then re-run.%s\n' "$c_dim" "$c_off"
+else
+  SMTP_PORT_IN_CONTAINER=$(docker compose exec -T hub printenv SMTP_PORT 2>/dev/null | tr -d '\r\n' || echo "587")
+  step "SMTP smoke test: $SMTP_HOST_IN_CONTAINER:${SMTP_PORT_IN_CONTAINER:-587}"
+
+  # The probe script lives in-process inside the hub container so it
+  # picks up the SAME env vars + the SAME aiosmtplib version the live
+  # send path uses. stdin via heredoc keeps the script out of the repo.
+  if ! docker compose exec -T hub uv run python - <<'PY'
+import asyncio
+import os
+import sys
+
+import aiosmtplib
+
+
+async def main() -> None:
+    host = os.environ.get("SMTP_HOST", "").strip()
+    if not host:
+        print("SMTP_HOST is empty inside the hub container", file=sys.stderr)
+        sys.exit(2)
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    use_starttls = os.environ.get("SMTP_STARTTLS", "true").lower() == "true"
+    user = os.environ.get("SMTP_USER") or None
+    password = os.environ.get("SMTP_PASS") or None
+
+    # start_tls=False here: we open a plaintext connection, then upgrade
+    # via STARTTLS only if requested. This matches the live send path in
+    # app/auth/email.py and supports both implicit-TLS (port 465 with
+    # start_tls=True at send time) and STARTTLS (587) servers when the
+    # operator's .env is shaped correctly.
+    client = aiosmtplib.SMTP(hostname=host, port=port, start_tls=False, timeout=10)
+    try:
+        await client.connect()
+        if use_starttls:
+            await client.starttls()
+        if user and password:
+            await client.login(user, password)
+        await client.quit()
+    except Exception as exc:  # noqa: BLE001 — surface any SMTP-side error
+        print(f"SMTP probe failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(1)
+    print("SMTP probe OK", flush=True)
+
+
+asyncio.run(main())
+PY
+  then
+    printf '%s✗ SMTP probe failed. Tearing down the stack so the next run starts clean.%s\n' "$c_red" "$c_off" >&2
+    docker compose down
+    die "Fix SMTP_* in .env and re-run. Common causes: wrong port (587 STARTTLS vs 465 implicit-TLS), app-password not enabled, host firewall blocking outbound 587."
+  fi
+  ok "SMTP probe OK ($SMTP_HOST_IN_CONTAINER)"
+fi
+
 # --- 2. Provision customer -------------------------------------------------
 
 step "Creating customer '$CUSTOMER_NAME' with allowlist [$TEST_EMAIL]"
@@ -95,48 +194,29 @@ ok "api_key:     ${API_KEY:0:12}…  (full value in API_KEY var; one-shot, won't
 
 # --- 3. Publish a fixture report -------------------------------------------
 
-# Build a JSON body with a multi-section HTML payload large enough to exercise
-# the iframe resize-poster (long content forces height >640 placeholder) plus
-# a short section at the end so S2-S4 see a real layout. The HTML is inlined
-# as a string per the publish contract (app/reports/schemas.py:PublishRequest).
+# Use the Indonesia credit-card dashboard sample as the embedded report.
+# `REPORT_HTML_FILE` override lets you swap fixtures without editing this script.
 
-step "Publishing fixture report"
+REPORT_HTML_FILE="${REPORT_HTML_FILE:-report-sample/indonesia-credit-card-dashboard.html}"
+REPORT_TITLE="${REPORT_TITLE:-Indonesia’s Credit Card Story}"
+REPORT_DESCRIPTION="${REPORT_DESCRIPTION:-Growth nationwide, divergence by region — 2009-01 → 2025-11}"
 
-HTML='<!doctype html><html><head><meta charset="utf-8"><title>Bootstrap Q1 Report</title>
-<style>body{font-family:system-ui,sans-serif;line-height:1.55;color:#212121;margin:0;padding:24px;max-width:760px}
-h1{font-size:32px;margin:0 0 16px}
-h2{font-size:22px;margin:48px 0 12px;color:#222}
-section{padding:24px 0;border-bottom:1px solid #eee}
-.metric{display:inline-block;margin-right:24px}
-.metric strong{display:block;font-size:28px;color:#0a7}
-.lipsum{color:#555;font-size:15px}</style></head>
-<body>
-<h1>Bootstrap Q1 Report</h1>
-<p class="lipsum">Synthetic data for the local human-test pass. Generated at bootstrap time.</p>
-<section><h2>Key metrics</h2>
-<div class="metric"><strong>+12%</strong>Revenue QoQ</div>
-<div class="metric"><strong>+8%</strong>Active users</div>
-<div class="metric"><strong>-3pp</strong>Churn</div></section>
-<section><h2>Narrative</h2>
-<p class="lipsum">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-<p class="lipsum">Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p></section>
-<section><h2>Detail</h2>
-<p class="lipsum">Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
-<p class="lipsum">Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.</p>
-<p class="lipsum">Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.</p></section>
-<section><h2>Closing</h2>
-<p class="lipsum">End of report. Iframe should grow to match this content height; chrome stays put above and below.</p></section>
-</body></html>'
+[ -f "$REPORT_HTML_FILE" ] || die "Report HTML not found: $REPORT_HTML_FILE"
 
+step "Publishing report from $REPORT_HTML_FILE"
+
+# --rawfile slurps the file as a single JSON string, handling all escaping
+# (quotes, newlines, backslashes) correctly. Avoids the brittle bash-quoting
+# games the earlier inline HTML required.
 BODY=$(jq -n \
   --arg customer_id "$CUSTOMER_ID" \
-  --arg title "Bootstrap Q1 Report" \
-  --arg description "Synthetic fixture for human-test pass" \
+  --arg title "$REPORT_TITLE" \
+  --arg description "$REPORT_DESCRIPTION" \
   --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  --arg html "$HTML" \
+  --rawfile html "$REPORT_HTML_FILE" \
   '{customer_id: $customer_id, title: $title, description: $description,
-    tags: ["q1","bootstrap"], generated_at: $generated_at, html: $html,
-    supplementary_files: []}')
+    tags: ["sample","indonesia-credit-card"], generated_at: $generated_at,
+    html: $html, supplementary_files: []}')
 
 PUBLISH_OUT=$(curl -sS -X POST "$HUB_URL/v1/reports" \
   -H "Authorization: Bearer $API_KEY" \
@@ -183,7 +263,7 @@ ${c_green}═══════════════════════�
 
   Customer:    $CUSTOMER_NAME ($CUSTOMER_ID)
   Test email:  $TEST_EMAIL
-  Report:      Bootstrap Q1 Report ($REPORT_ID)
+  Report:      $REPORT_TITLE ($REPORT_ID)
 
   ${c_blue}Click to start:${c_off}
   $CONSUME_URL

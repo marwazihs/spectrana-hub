@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: SecretStr | None = None
     AWS_SECRET_ACCESS_KEY: SecretStr | None = None
 
+    # URL scheme for outbound magic links (email body + API response).
+    # Defaults to https for prod; set HUB_URL_SCHEME=http in local compose
+    # so SMTP-delivered links and the agent's return URL both work over
+    # http://localhost.
+    HUB_URL_SCHEME: str = "https"
+
     # SMTP
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

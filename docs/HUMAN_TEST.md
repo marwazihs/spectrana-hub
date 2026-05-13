@@ -13,7 +13,34 @@ If anything below fails, fix on `develop` with a regression test, commit,
 
 ## 0. Prep
 
-### Bring up the stack and bootstrap a test report
+### 0.1 Configure SMTP (optional but recommended)
+
+Email-delivery scenarios (S6, S16) need a working SMTP relay. The bootstrap
+script itself uses `delivery=return` and doesn't need email — it can print a
+clickable link directly. But if you want to test the full inbox flow, populate
+`.env` in the project root (it's already gitignored):
+
+```
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=...
+SMTP_PASS=...
+SMTP_STARTTLS=true
+HUB_EMAIL_FROM=You <you@your-verified-domain.com>
+HUB_EMAIL_BRAND_NAME=Spectrana Hub
+```
+
+Compose auto-loads `.env`. The bootstrap script will detect drift (`.env`
+populated but the running hub container has an empty `SMTP_HOST`) and
+`--force-recreate hub` for you, then run a real connect → STARTTLS → login
+SMTP probe before going further. **If the probe fails, the script tears the
+stack down and exits non-zero** — better than proceeding with a silently
+broken email path.
+
+Skip this step if you only want to walk the in-browser scenarios; just leave
+`SMTP_HOST` unset.
+
+### 0.2 Bring up the stack and bootstrap a test report
 
 ```bash
 ./scripts/human-test-bootstrap.sh
@@ -23,17 +50,21 @@ That script:
 
 1. Runs `docker compose up -d` if the stack isn't already up.
 2. Waits for `/healthz`.
-3. Creates a customer (`Bootstrap Test Co`) with `TEST_EMAIL` allowlisted.
+3. If `.env` has new SMTP values that aren't injected yet, recreates `hub`.
+4. Runs the SMTP smoke test (skipped if `SMTP_HOST` empty). Failure → teardown.
+5. Creates a customer (`Bootstrap Test Co`) with `TEST_EMAIL` allowlisted.
    Defaults to `marwazihs@gmail.com`; override via `TEST_EMAIL=you@example.com`.
-4. Publishes a fixture report (~4 sections, long enough to exercise the
-   resize-poster past the 640px placeholder).
-5. Mints a single-use magic link in return-mode.
-6. Prints the consume URL ready to click, and offers to `open` it on macOS.
+6. Publishes `report-sample/indonesia-credit-card-dashboard.html` as the
+   embedded report. Plotly charts via CDN, ~17 years of monthly time-series
+   data, three sections (national trend, seasonality, Jakarta vs Bali).
+   Override with `REPORT_HTML_FILE=path/to/other.html`.
+7. Mints a single-use magic link in return-mode and prints the consume URL.
+8. On a TTY, asks if you want to `open` the URL in your default browser.
 
 Re-running creates a fresh customer + report (new IDs each time). Reset
 everything with `docker compose down -v && ./scripts/human-test-bootstrap.sh`.
 
-### Manual fallback (if you want to walk it by hand)
+### 0.3 Manual fallback (if you want to walk it by hand)
 
 ```bash
 # 1. Stack
@@ -47,11 +78,11 @@ docker compose exec hub uv run python -m scripts.manage_customer create \
 export CUSTOMER_ID='...'
 export API_KEY='mvk_live_...'
 
-# 3. Publish (JSON body — html inline as a string)
+# 3. Publish (JSON body — html inline as a string; --rawfile slurps a file)
 jq -n --arg cid "$CUSTOMER_ID" --arg gen "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{customer_id:$cid, title:"Q1", description:"", tags:["q1"],
-    generated_at:$gen, html:"<html><body><h1>Hi</h1></body></html>",
-    supplementary_files:[]}' \
+  --rawfile html report-sample/indonesia-credit-card-dashboard.html \
+  '{customer_id:$cid, title:"Indonesia Q4", description:"", tags:["sample"],
+    generated_at:$gen, html:$html, supplementary_files:[]}' \
 | curl -sS -X POST http://localhost:8000/v1/reports \
     -H "Authorization: Bearer $API_KEY" \
     -H "Content-Type: application/json" \
@@ -59,12 +90,13 @@ jq -n --arg cid "$CUSTOMER_ID" --arg gen "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     -d @- | tee /tmp/publish.json
 export REPORT_ID=$(jq -r .report_id /tmp/publish.json)
 
-# 4. Mint link (return-mode → URL in response, no SMTP needed)
+# 4. Mint link (return-mode → URL in response; comes back http:// for local
+#    because HUB_URL_SCHEME=http is set in compose. No bash rewrite needed.)
 curl -sS -X POST "http://localhost:8000/r/$REPORT_ID/request-link" \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","delivery":"return","channel_hint":"manual"}' \
-| jq -r '.url' | sed 's|https://|http://|'
+| jq -r '.url'
 ```
 
 ---
@@ -74,11 +106,16 @@ curl -sS -X POST "http://localhost:8000/r/$REPORT_ID/request-link" \
 Each scenario is a checkbox. Open the consume URL from step 0 in a real
 browser and walk through:
 
-### S1 — First click, chrome renders
+### S1 — First click, chrome + charts render
 
-- [ ] Lands on `/r/[id]` with chrome rendered
+- [ ] Lands on `/r/[id]` with chrome rendered (no "Link expired" page)
 - [ ] Title, customer name, generated-at all show
 - [ ] Iframe loads with report content visible
+- [ ] **Plotly charts render**: national trend (3 lines), seasonality
+      (bar + line), Jakarta vs Bali (grouped bars). If the iframe shows the
+      surrounding cards/text but the chart areas are blank, the CSP is
+      blocking the CDN — that's a regression on the M9 CSP relaxation.
+- [ ] No console errors in DevTools (CSP violations show up here)
 
 ### S2 — Iframe height adjusts past placeholder
 
@@ -90,6 +127,7 @@ browser and walk through:
 
 - [ ] Slowly resize the browser window between 600px and 1400px wide
 - [ ] Iframe height re-adjusts smoothly; no visible flicker
+- [ ] Plotly charts re-flow (they're `responsive: true`)
 - [ ] Chrome layout stays stable; max-width caps at 1200px
 
 ### S4 — Mobile feel (375px viewport)
@@ -100,22 +138,35 @@ DevTools → Toggle device toolbar → iPhone 12 (or any 375px width).
 - [ ] Report title shrinks to ~24px
 - [ ] **Sign out** button still tappable (≥44px touch target)
 - [ ] No horizontal scrollbar on the page
-- [ ] Content inside the iframe reflows; no horizontal scroll inside either
+- [ ] Content inside the iframe reflows; KPI cards stack to 1 column
 
 ### S5 — Sign out
 
 - [ ] Click **Sign out**
-- [ ] Lands back on `/r/[id]` email-entry page
-- [ ] DevTools → Application → Cookies → `localhost:3000`: `hub_session` is gone
+- [ ] Lands back on `/r/[id]` email-entry page (NOT on `0.0.0.0:3000` —
+      the M8.1 host-header fix guards against this regression)
+- [ ] DevTools → Application → Cookies → `localhost:3000`: `hub_session`
+      is gone
+- [ ] URL bar shows `localhost:3000/r/[id]`, not `0.0.0.0:3000/...`
 
-### S6 — Sign out persists across refresh
+### S6 — Real email delivery (skip if SMTP not configured)
 
-- [ ] Refresh the page (the email-entry page from S5)
-- [ ] Still on email-entry; no iframe; cookie still absent
+- [ ] Submit your `TEST_EMAIL` on the email-entry page from S5
+- [ ] **Check your inbox.** Magic link should arrive within ~30s
+- [ ] Subject line reads `Your <HUB_EMAIL_BRAND_NAME> report link`
+- [ ] From name matches `HUB_EMAIL_FROM`
+- [ ] Body has a clear CTA / link to the report
+- [ ] **Click the link in the email** — should sign you in directly
+      (NOT land on the email-entry form). If it does land on the form,
+      the M9 emailed-link path regression is back: `build_magic_link`
+      must produce `/r/<id>/consume?token=...`, not `/r/<id>?token=...`.
+- [ ] URL scheme matches `HUB_URL_SCHEME` — `http` for local compose,
+      `https` for any deployed env
 
-### S7 — Email submit (real email)
+### S7 — Email submit, anti-enum copy
 
-- [ ] Type `TEST_EMAIL` (the same one the bootstrap script used) into the form
+- [ ] Sign out again (or use a fresh private window)
+- [ ] Type `TEST_EMAIL` into the form on `/r/[id]`
 - [ ] Submit
 - [ ] Form swaps to: "If this email is on file, a link has been sent."
 - [ ] Email input field disappears; heading remains
@@ -126,13 +177,19 @@ DevTools → Toggle device toolbar → iPhone 12 (or any 375px width).
 - [ ] Submit a **bogus email** like `not-on-allowlist@example.com`
 - [ ] **Response text is byte-identical to S7** (same wording, same DOM)
 - [ ] DevTools → Network → compare both submissions' response times
-- [ ] Times should be within ~50ms (the rate-limit gate fires before any branch on report existence/allowlist membership)
+- [ ] Times should be within ~50ms (the rate-limit gate fires before any
+      branch on report existence/allowlist membership)
 
-### S9 — Replayed link (single-use)
+### S9 — Replayed link (single-use after dedup window)
+
+The consume route caches successful consumes for ~90s to handle
+duplicate-fire from prefetch/macOS-LaunchServices/etc — clicking the same
+link twice in quick succession both succeed. After the cache expires,
+replay returns 410 as expected.
 
 - [ ] Take the consume URL from step 0 (already clicked in S1)
-- [ ] Paste it again in a fresh tab
-- [ ] Renders the "This link has expired" page (HTTP 410)
+- [ ] Paste it again in a fresh tab within ~90s → still works (dedup)
+- [ ] Wait 90s, paste it again → "This link has expired" page (HTTP 410)
 - [ ] Big headline, body copy, "Request a new link" button visible
 - [ ] Button leads back to `/r/[id]` email-entry
 
@@ -155,6 +212,8 @@ DevTools → Network → click the `/r/[id]` request → Response headers.
 DevTools → Network → click the `localhost:8000/render/...` request → Response headers.
 
 - [ ] `Content-Security-Policy` contains `frame-ancestors localhost:3000`
+- [ ] CSP allows `https:` for `script-src`, `style-src`, `font-src`,
+      `connect-src` (needed for Plotly + other CDN libs)
 - [ ] `Cache-Control: private, no-cache, must-revalidate`
 - [ ] `ETag` ends with `v2` (the injector version)
 - [ ] `Referrer-Policy: no-referrer`
@@ -193,7 +252,7 @@ docker compose exec postgres psql -U hub -d hub -c \
 
 - [ ] Click the (now expired) link
 - [ ] "This link has expired" page renders (HTTP 410)
-- [ ] Same surface as S9
+- [ ] Same surface as S9 (post-90s)
 
 ### S15 — Session sliding-window refresh
 
@@ -201,36 +260,27 @@ docker compose exec postgres psql -U hub -d hub -c \
 - [ ] Leave the tab open ~90 seconds
 - [ ] Reload `/r/[id]` — chrome still renders (no re-auth)
 - [ ] DevTools → Network → /r/[id] request → no 302 to email-entry
-- [ ] (The session row's `last_accessed_at` and `expires_at` slide forward server-side; the cookie value is unchanged.)
+- [ ] (The session row's `last_accessed_at` and `expires_at` slide forward
+      server-side; the cookie value is unchanged.)
 
----
+### S16 — SMTP probe failure mode (skip if not testing SMTP path)
 
-## Optional: real email rendering (requires SMTP)
+Verify the bootstrap script's fail-closed behavior on a bad SMTP config.
 
-If you want to verify the actual email template:
+```bash
+docker compose down -v
+# Temporarily break .env (wrong password)
+SMTP_PASS_BACKUP=$(grep '^SMTP_PASS=' .env)
+sed -i.bak 's/^SMTP_PASS=.*/SMTP_PASS=wrong-password-on-purpose/' .env
+./scripts/human-test-bootstrap.sh
+# Restore
+echo "$SMTP_PASS_BACKUP" > /tmp/x && mv .env.bak .env
+```
 
-1. Add SMTP env vars to `docker-compose.yml` under the `hub` service:
-   ```yaml
-   SMTP_HOST: smtp.your-provider.com
-   SMTP_PORT: 587
-   SMTP_USER: ...
-   SMTP_PASS: ...
-   HUB_EMAIL_FROM: 'Hub Test <you@yourdomain.com>'
-   ```
-2. `docker compose up -d --build hub`
-3. Mint a link with `delivery: "email"` instead of `"return"`:
-   ```bash
-   curl -sS -X POST "http://localhost:8000/r/$REPORT_ID/request-link" \
-     -H "Authorization: Bearer $API_KEY" \
-     -H "Content-Type: application/json" \
-     -d '{"email":"you@example.com","delivery":"email"}'
-   ```
-4. Check your inbox.
-
-- [ ] From name matches `HUB_EMAIL_FROM`
-- [ ] Subject line reads sensibly ("Your Majeve report is ready" or similar)
-- [ ] Body has a clear CTA button
-- [ ] CTA link opens the consume URL and the flow works end-to-end via email
+- [ ] Script reaches "SMTP smoke test" step and prints the SMTP error class
+- [ ] Script runs `docker compose down` automatically
+- [ ] Exit code is non-zero
+- [ ] Stack is gone (`docker compose ps` shows nothing)
 
 ---
 
@@ -250,14 +300,18 @@ If you want to verify the actual email template:
 
 **Ready to merge to master when:**
 
-- [ ] S1–S13 all pass as described
-- [ ] S14 expired-link state looks right (use SQL fast-path or wait 16 minutes)
+- [ ] S1–S5 all pass — chrome, charts, resize, mobile, sign-out
+- [ ] S6 emailed-link works end-to-end (or SMTP intentionally not configured)
+- [ ] S7–S8 anti-enum copy + timing pass — **S8 is load-bearing**
+- [ ] S9–S10 single-use + fake-ID surfaces match
+- [ ] S11–S13 security headers + host guard pass
+- [ ] S14 expired-link state looks right
 - [ ] S15 session refresh works
-- [ ] No console errors in the browser DevTools across the whole flow
+- [ ] S16 SMTP fail-closed works (or SMTP not configured)
+- [ ] No console errors in DevTools across the whole flow
 - [ ] Mobile feel is acceptable (S4)
-- [ ] **S8 anti-enum response timing doesn't reveal allowlist membership** — this is the load-bearing one
 
-If any scenario fails, fix on `develop` (commit + test), then:
+If any scenario fails, fix on `develop` (commit + regression test), then:
 
 ```bash
 docker compose down -v

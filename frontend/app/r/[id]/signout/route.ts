@@ -37,9 +37,25 @@ export async function POST(
     }
   }
 
-  const redirect = NextResponse.redirect(new URL(`/r/${reportId}`, req.url), {
-    status: 303,
-  });
+  // Build the redirect URL from the inbound Host header rather than
+  // `req.url`. Inside the Next.js container, `req.url` resolves to the
+  // container bind address (e.g. http://0.0.0.0:3000), and redirecting
+  // there sends the browser to a different origin than the one that
+  // received the Set-Cookie clear — the browser appears not to have
+  // signed out because it lands on an origin that never had the cookie.
+  const forwardedHost = req.headers.get("x-forwarded-host");
+  const host = forwardedHost || req.headers.get("host") || "";
+  const proto =
+    req.headers.get("x-forwarded-proto") ||
+    (host.startsWith("localhost") || host.startsWith("127.")
+      ? "http"
+      : req.nextUrl.protocol.replace(":", ""));
+  const redirectUrl = host
+    ? `${proto}://${host}/r/${reportId}`
+    : new URL(`/r/${reportId}`, req.url).toString();
+
+  const redirect = NextResponse.redirect(redirectUrl, { status: 303 });
+  redirect.headers.set("Cache-Control", "no-store");
   redirect.cookies.set({
     name: HUB_SESSION_COOKIE,
     value: "",

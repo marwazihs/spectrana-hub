@@ -21,7 +21,10 @@ def test_build_magic_link_shape() -> None:
     rid = uuid4()
     token = "tokenvalue123"
     link = build_magic_link(rid, token)
-    assert link == f"https://{settings.HUB_PRIMARY_DOMAIN}/r/{rid}?token={token}"
+    assert link == (
+        f"{settings.HUB_URL_SCHEME}://{settings.HUB_PRIMARY_DOMAIN}"
+        f"/r/{rid}/consume?token={token}"
+    )
 
 
 def test_render_includes_link_and_brand() -> None:
@@ -30,8 +33,8 @@ def test_render_includes_link_and_brand() -> None:
     assert "Majeve" in rendered.subject
     assert "Majeve" in rendered.text
     assert "Majeve" in rendered.html
-    assert f"/r/{rid}?token=abc123" in rendered.text
-    assert f"/r/{rid}?token=abc123" in rendered.html
+    assert f"/r/{rid}/consume?token=abc123" in rendered.text
+    assert f"/r/{rid}/consume?token=abc123" in rendered.html
 
 
 def test_render_uses_settings_defaults() -> None:
@@ -84,7 +87,7 @@ async def test_send_dispatches_to_aiosmtplib(monkeypatch: pytest.MonkeyPatch) ->
     assert msg["To"] == "ops@acme.com"
     body = msg.get_body(("plain",))
     assert body is not None
-    assert f"/r/{rid}?token=rawtok" in body.get_content()
+    assert f"/r/{rid}/consume?token=rawtok" in body.get_content()
 
     kwargs = captured["kwargs"]
     assert isinstance(kwargs, dict)

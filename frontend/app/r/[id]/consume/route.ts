@@ -19,6 +19,54 @@ import { HUB_SESSION_COOKIE, consumeMagicLink } from "@/lib/hub-client";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+// In-memory dedup cache: when a magic link is consumed, several browser
+// agents can race to GET the consume URL — Chrome speculation/prerender,
+// macOS LaunchServices delivering the URL to multiple processes, link
+// scanners, etc. Only the first reaches Hub successfully; the rest see
+// 410 and render the expired-link page even though the legitimate user
+// just clicked.
+//
+// We cache the consumed payload by token for a short window and re-issue
+// the same cookie/redirect for duplicates. The cache key is the raw token,
+// so only requests carrying the same single-use token benefit — a stolen
+// or guessed token still has to pass Hub's check.
+//
+// Module-level Map persists for the life of the Next.js worker (long
+// enough to cover the burst of duplicate requests, short enough that it
+// doesn't act as a session store). The TTL is 90s — comfortably longer
+// than any plausible burst, well under the magic-link TTL itself.
+type CachedConsume = {
+  session_id: string;
+  expires_at: string;
+  cached_at: number;
+};
+const CONSUME_DEDUP_TTL_MS = 90_000;
+const consumeCache = new Map<string, CachedConsume>();
+
+function getCachedConsume(token: string): CachedConsume | null {
+  const hit = consumeCache.get(token);
+  if (!hit) return null;
+  if (Date.now() - hit.cached_at > CONSUME_DEDUP_TTL_MS) {
+    consumeCache.delete(token);
+    return null;
+  }
+  return hit;
+}
+
+function putCachedConsume(
+  token: string,
+  payload: { session_id: string; expires_at: string },
+): void {
+  consumeCache.set(token, { ...payload, cached_at: Date.now() });
+  // Opportunistic GC: if the map grew unbounded, sweep expired entries.
+  if (consumeCache.size > 256) {
+    const cutoff = Date.now() - CONSUME_DEDUP_TTL_MS;
+    for (const [k, v] of consumeCache) {
+      if (v.cached_at < cutoff) consumeCache.delete(k);
+    }
+  }
+}
+
 export async function GET(
   req: NextRequest,
   context: RouteContext,
@@ -30,16 +78,36 @@ export async function GET(
     return renderExpiredPage(reportId);
   }
 
-  let consumed;
-  try {
-    consumed = await consumeMagicLink(reportId, token);
-  } catch {
-    // Hub error / network failure. Don't leak the cause — render the
-    // expired-link page. Operational visibility is on the Hub side.
-    return renderExpiredPage(reportId);
+  // Belt: refuse browser speculation when the browser tells us. Modern
+  // Chrome sends `Sec-Purpose: prefetch[;prerender]` for speculation-rule
+  // fetches — returning 204 lets the real navigation hit a live token.
+  const secPurpose = req.headers.get("sec-purpose") || "";
+  if (secPurpose.includes("prefetch") || secPurpose.includes("prerender")) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
-  if (consumed === null) {
-    return renderExpiredPage(reportId);
+
+  // Suspenders: many duplicate-consume sources don't set Sec-Purpose
+  // (macOS LaunchServices opening the URL in multiple processes, link
+  // scanners, browser-back replays). If we just succeeded for this token
+  // a moment ago, re-issue the same cookie+redirect instead of asking
+  // Hub to consume an already-consumed token (which 410s).
+  const cached = getCachedConsume(token);
+  let consumed: { session_id: string; expires_at: string } | null;
+  if (cached) {
+    consumed = { session_id: cached.session_id, expires_at: cached.expires_at };
+  } else {
+    try {
+      consumed = await consumeMagicLink(reportId, token);
+    } catch {
+      return renderExpiredPage(reportId);
+    }
+    if (consumed === null) {
+      return renderExpiredPage(reportId);
+    }
+    putCachedConsume(token, consumed);
   }
 
   // Compute the cookie max-age from Hub's reported expiry so the cookie
@@ -51,10 +119,25 @@ export async function GET(
     ? Math.max(60, Math.floor((expiresMs - Date.now()) / 1000))
     : 24 * 3600;
 
-  const redirect = NextResponse.redirect(
-    new URL(`/r/${reportId}`, req.url),
-    { status: 302 },
-  );
+  // Build the redirect target from the incoming Host header rather than
+  // `req.url`. Inside the Next.js container, `req.url` resolves to the
+  // container bind address (e.g. http://0.0.0.0:3000), and redirecting
+  // there sends the browser to a different origin than the one that just
+  // received the Set-Cookie — losing the session cookie. Honour the
+  // forwarded host first (proxies), then Host.
+  const forwardedHost = req.headers.get("x-forwarded-host");
+  const host = forwardedHost || req.headers.get("host") || "";
+  const proto =
+    req.headers.get("x-forwarded-proto") ||
+    (host.startsWith("localhost") || host.startsWith("127.")
+      ? "http"
+      : req.nextUrl.protocol.replace(":", ""));
+  const redirectUrl = host
+    ? `${proto}://${host}/r/${reportId}`
+    : new URL(`/r/${reportId}`, req.url).toString();
+
+  const redirect = NextResponse.redirect(redirectUrl, { status: 302 });
+  redirect.headers.set("Cache-Control", "no-store");
   redirect.cookies.set({
     name: HUB_SESSION_COOKIE,
     value: consumed.session_id,
@@ -109,7 +192,10 @@ function renderExpiredPage(reportId: string): NextResponse {
 </html>`;
   return new NextResponse(html, {
     status: 410,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
   });
 }
 
