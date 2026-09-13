@@ -34,6 +34,7 @@ from app.auth.rate_limit import (
     check_magic_link_report,
 )
 from app.auth.service import mint_iframe_jwt, mint_magic_link, verify_iframe_jwt
+from app.client_ip import client_ip
 from app.config import settings
 from app.errors import (
     HubError,
@@ -159,13 +160,6 @@ async def render_iframe(
 # === Magic-link request — dual-personality endpoint =====================
 
 
-def _client_ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for")
-    if fwd:
-        return fwd.split(",")[0].strip()
-    return request.client.host if request.client else "0.0.0.0"
-
-
 async def _load_report(session: AsyncSession, report_id: UUID) -> Report | None:
     return await session.get(Report, report_id)
 
@@ -246,7 +240,7 @@ async def _public_request_link(
 ) -> RequestLinkPublicResponse:
     """Anti-enum path. Always returns the same 200 regardless of report
     existence, allowlist membership, or SMTP outcome."""
-    ip = _client_ip(request)
+    ip = client_ip(request)
 
     # Rate-limit gates fire BEFORE any branch on report existence so timing
     # doesn't leak.
@@ -295,7 +289,7 @@ async def _agent_request_link(
     even when channel is chat/SMS); off-allowlist → 422 with a distinct
     slug since the caller is authenticated and gains nothing from the
     anti-enum shape."""
-    ip = _client_ip(request)
+    ip = client_ip(request)
     await check_magic_link_api_key(session, customer.id)
 
     report = await _load_report(session, report_id)

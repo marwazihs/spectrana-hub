@@ -215,6 +215,39 @@ async def test_public_ip_rate_limit_returns_429(
     assert "retry-after" in {k.lower() for k in over.headers}
 
 
+@pytest.mark.asyncio
+async def test_public_ip_rate_limit_buckets_by_rightmost_forwarded_ip(
+    client: AsyncClient, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Behind Traefik → Next.js, distinct visitors must get distinct buckets,
+    and a client-supplied leftmost X-Forwarded-For must not pick the bucket."""
+    monkeypatch.setattr(settings, "RATE_LIMIT_MAGIC_LINK_PER_IP_PER_MIN", 1)
+    c, _ = await _make_customer(session, allowlist=["ops@acme.com"])
+    r = await _make_report(session, c)
+    url = f"/r/{r.id}/request-link"
+    body = {"email": "ops@acme.com"}
+
+    first = await client.post(url, json=body, headers={"X-Forwarded-For": "203.0.113.1"})
+    assert first.status_code == 200
+
+    # Different visitor → own bucket.
+    other = await client.post(url, json=body, headers={"X-Forwarded-For": "203.0.113.2"})
+    assert other.status_code == 200
+
+    # Same visitor rotating a spoofed leftmost entry → still the same bucket.
+    spoofed = await client.post(
+        url, json=body, headers={"X-Forwarded-For": "6.6.6.6, 203.0.113.1"}
+    )
+    assert spoofed.status_code == 429
+
+    ev = (
+        await session.execute(
+            select(Event).where(Event.event_type == "magic_link_issued")
+        )
+    ).scalars().all()
+    assert {e.payload["ip"] for e in ev} == {"203.0.113.1", "203.0.113.2"}
+
+
 # === Agent (API-key) path — real errors + delivery options =============
 
 

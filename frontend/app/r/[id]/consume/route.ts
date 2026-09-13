@@ -15,7 +15,11 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { HUB_SESSION_COOKIE, consumeMagicLink } from "@/lib/hub-client";
+import {
+  HUB_SESSION_COOKIE,
+  clientIpFrom,
+  consumeMagicLink,
+} from "@/lib/hub-client";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -100,7 +104,7 @@ export async function GET(
     consumed = { session_id: cached.session_id, expires_at: cached.expires_at };
   } else {
     try {
-      consumed = await consumeMagicLink(reportId, token);
+      consumed = await consumeMagicLink(reportId, token, clientIpFrom(req.headers));
     } catch {
       return renderExpiredPage(reportId);
     }

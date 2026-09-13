@@ -1,6 +1,8 @@
 "use server";
 
-import { requestMagicLink } from "@/lib/hub-client";
+import { headers } from "next/headers";
+
+import { clientIpFrom, requestMagicLink } from "@/lib/hub-client";
 
 /**
  * Server action for the email-entry form. The Next.js viewer is the
@@ -37,7 +39,7 @@ export async function submitRequestLink(
   }
 
   try {
-    await requestMagicLink(reportId, email);
+    await requestMagicLink(reportId, email, clientIpFrom(await headers()));
   } catch {
     // Hub/transport bug. Still show the generic submitted state so the
     // failure mode looks identical to the success mode. Operational

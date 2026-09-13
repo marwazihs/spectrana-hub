@@ -31,6 +31,30 @@ function internalHeaders(): HeadersInit {
   };
 }
 
+/**
+ * Client IP to forward to Hub for rate limiting and audit events.
+ *
+ * Takes the RIGHTMOST non-empty X-Forwarded-For entry: in production that's
+ * the value Traefik wrote (it drops client-supplied X-Forwarded-* on its
+ * untrusted entrypoints), and Next.js only fills the header when absent.
+ * The leftmost entry is client-controlled whenever a proxy appends. Hub
+ * re-validates the value (app/client_ip.py). See
+ * docs/operations/dokploy-deploy.md.
+ */
+export function clientIpFrom(headers: Headers): string | null {
+  const fwd = headers.get("x-forwarded-for");
+  if (!fwd) return null;
+  const entries = fwd
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+  return entries.length > 0 ? entries[entries.length - 1] : null;
+}
+
+function forwardedFor(clientIp: string | null): Record<string, string> {
+  return clientIp ? { "X-Forwarded-For": clientIp } : {};
+}
+
 export type RequestLinkResponse = {
   status: "accepted";
   message: string;
@@ -44,10 +68,11 @@ export type RequestLinkResponse = {
 export async function requestMagicLink(
   reportId: string,
   email: string,
+  clientIp: string | null = null,
 ): Promise<RequestLinkResponse> {
   const r = await fetch(`${hubBase()}/r/${reportId}/request-link`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...forwardedFor(clientIp) },
     body: JSON.stringify({ email }),
     cache: "no-store",
   });
@@ -75,10 +100,11 @@ export type ConsumeResponse = {
 export async function consumeMagicLink(
   reportId: string,
   token: string,
+  clientIp: string | null = null,
 ): Promise<ConsumeResponse | null> {
   const r = await fetch(`${hubBase()}/internal/magic-link/consume`, {
     method: "POST",
-    headers: internalHeaders(),
+    headers: { ...internalHeaders(), ...forwardedFor(clientIp) },
     body: JSON.stringify({ report_id: reportId, token }),
     cache: "no-store",
   });

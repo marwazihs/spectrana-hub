@@ -30,6 +30,7 @@ from app.auth.service import (
     revoke_session,
     verify_and_refresh_session,
 )
+from app.client_ip import client_ip
 from app.config import settings
 from app.db.session import get_session
 from app.errors import HubError, magic_link_expired_or_consumed
@@ -78,13 +79,6 @@ class ConsumeResponse(BaseModel):
     expires_at: datetime
 
 
-def _client_ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for")
-    if fwd:
-        return fwd.split(",")[0].strip()
-    return request.client.host if request.client else "0.0.0.0"
-
-
 @router.post(
     "/magic-link/consume",
     response_model=ConsumeResponse,
@@ -114,7 +108,7 @@ async def consume_magic_link_internal(
         session,
         customer_id=row.customer_id,
         token_jti=row.token_hash[:16],
-        ip=_client_ip(request),
+        ip=client_ip(request),
     )
     await session.commit()
 
