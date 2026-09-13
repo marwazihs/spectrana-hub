@@ -71,9 +71,9 @@ Live facts (2026-09-13): server `hostinger-vps` (`srv01-elgean`, 72.62.80.76, si
 - [x] 3.2 `https://hub.majie.ai/api/healthz` → `{"status":"ok"}`
 - [x] 3.3 Create first customer via `hub` container terminal — test customer **Demo Bistro** (`b7f9350d-240f-46d0-88d7-3e547ff65a66`, allowlist `marwazihs@gmail.com`)
 - [x] 3.4 Publish a report via `https://hub.majie.ai/api/v1/reports`; returned `url` loads — sample report `01a09cc5-9068-7ad1-a071-f6164a21830a` for Demo Bistro: 201, API get/list OK, stored in MinIO, viewer URL 200
-- [ ] 3.5 Magic link by email arrives; sign in; iframe renders (desktop + phone)
-- [ ] 3.6 Rate-limit sanity: `events` rows show real client IPs, not a container IP
-- [~] 3.7 Render guards: no token → 422, bad token → 401, `/render` via primary host → 404 ✅. Still to check: iframe works inside viewer (with 3.5)
+- [~] 3.5 Magic link by email arrives; sign in; iframe renders (desktop + phone) — **desktop ✅** (email from `marginleak@majie.ai` via Brevo received, consume → session → iframe JWT → render all 200). Phone: pending
+- [x] 3.6 Rate-limit sanity: `events` rows show real client IPs, not a container IP — request came via frontend container `10.0.1.169`, but `magic_link_issued`/`magic_link_consumed` and `rate_limit_hits` recorded the owner's real public IP. **Client-IP fix verified in production**
+- [x] 3.7 Render guards: no token → 422, bad token → 401, `/render` via primary host → 404; iframe renders inside viewer with a valid JWT
 
 ### Phase 4 — Harden & hand over
 - [ ] 4.1 Postgres backups (managed DB → S3 schedule) + test restore
@@ -91,6 +91,7 @@ Append one line per session: date, what was done, where it stopped.
 - 2026-09-13 — Analysis + decisions D1–D13. Client-IP fix + tests, `docker-compose.prod.yml`, `.env.dokploy.example`, local smoke test. Next: 1.9 (commit/push), then owner answers Q1–Q5 and starts Phase 2.
 - 2026-09-13 — Owner answered Q1, Q2, Q4, Q5 (D14–D16). Pushed `develop`. Next: owner runs Phase 2 in Dokploy.
 - 2026-09-13 — First deploy failed: (1) `DATABASE_URL` scheme `postgresql://` → `No module named 'psycopg2'`; (2) managed Postgres created in UI but never deployed (no swarm service). Owner deployed DB + fixed scheme; redeploy OK: migrate/bucket-init exit 0, hub+frontend up. External checks pass (healthz, viewer 200, API 401 without key, render guards, certs). Next: 3.3–3.6.
+- 2026-09-13 — Created test customer Demo Bistro, published sample report, owner signed in on desktop via emailed magic link. Verified client-IP fix in prod DB. Next: 3.5 phone check, then Phase 4.
 - 2026-09-13 — GitGuardian false positives on placeholders: blanked `.env.dokploy.example` secrets, bare `${VAR:?}` credential refs, `mc` keys via stdin (`a0c387b`). CI green. Decided D17. Next: owner runs Phase 2 in Dokploy; mark old GitGuardian incidents as false positive.
 
 ---
@@ -134,6 +135,7 @@ Source: `github.com/Dokploy/website` docs (`apps/docs/content/docs/core/`), chec
 ## Known issues outside this task
 
 - `/api/docs` (FastAPI Swagger UI) and `/api/openapi.json` are publicly reachable. Not a secret leak (routes are auth-guarded) but exposes the API surface; consider disabling docs in prod.
+- Uvicorn access log records the full `/render/<id>?t=<iframe JWT>` URL. JWT TTL is 60s so exposure is small, but tokens in logs are a hygiene issue; consider filtering the query string from access logs.
 - Managed DB runs **postgres:18**; code, CI, and tests use postgres:16. Migrations ran fine; watch for version-specific issues.
 - Dokploy troubleshooting: a created database does nothing until **Deploy** is clicked on the database itself.
 
