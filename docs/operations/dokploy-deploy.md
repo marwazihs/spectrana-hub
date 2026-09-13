@@ -70,7 +70,7 @@ Live facts (2026-09-13): server `hostinger-vps` (`srv01-elgean`, 72.62.80.76, si
 - [x] 3.1 `migrate` container exited 0 (Logs tab)
 - [x] 3.2 `https://hub.majie.ai/api/healthz` → `{"status":"ok"}`
 - [x] 3.3 Create first customer via `hub` container terminal — test customer **Demo Bistro** (`b7f9350d-240f-46d0-88d7-3e547ff65a66`, allowlist `marwazihs@gmail.com`)
-- [ ] 3.4 Publish a report via `https://hub.majie.ai/api/v1/reports`; returned `url` loads
+- [x] 3.4 Publish a report via `https://hub.majie.ai/api/v1/reports`; returned `url` loads — sample report `01a09cc5-9068-7ad1-a071-f6164a21830a` for Demo Bistro: 201, API get/list OK, stored in MinIO, viewer URL 200
 - [ ] 3.5 Magic link by email arrives; sign in; iframe renders (desktop + phone)
 - [ ] 3.6 Rate-limit sanity: `events` rows show real client IPs, not a container IP
 - [~] 3.7 Render guards: no token → 422, bad token → 401, `/render` via primary host → 404 ✅. Still to check: iframe works inside viewer (with 3.5)
