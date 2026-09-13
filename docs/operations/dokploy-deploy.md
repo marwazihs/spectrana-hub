@@ -16,7 +16,7 @@
 | D2 | Compose file | New `docker-compose.prod.yml`; local `docker-compose.yml` unchanged | Dokploy *Compose Path* = `./docker-compose.prod.yml` |
 | D3 | Viewer domain | `hub.majie.ai` → `frontend:3000` | |
 | D4 | Agent API | `hub.majie.ai/api` → `hub:8000` with **Strip Path** | No code change; agents call `https://hub.majie.ai/api/v1/reports` |
-| D5 | Reports (iframe) domain | `reports.hub.majie.ai` → `hub:8000` | **Assumed, confirm with owner** (see Open questions). Must be a different origin from D3 |
+| D5 | Reports (iframe) domain | `reports.hub.majie.ai` → `hub:8000` | Confirmed by owner. Must be a different origin from D3 |
 | D6 | Postgres | Dokploy-managed Postgres in the same Dokploy project | Owner provides connection string; use internal host. Driver must be `postgresql+asyncpg://` |
 | D7 | Object storage | MinIO inside the compose stack (named volume) | Revisit external S3/R2 later |
 | D8 | Client-IP fix | Fix before go-live | See [Code change: client IP](#code-change-client-ip) |
@@ -24,15 +24,18 @@
 | D10 | Replicas | `hub` = 1 | APScheduler nightly sweep runs in-process |
 | D11 | MinIO image | `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` (pinned) | Docker Hub `minio/minio` and `minio/mc` are **no longer pullable** (verified 2026-09-13). Quay image is official but frozen (no updates since 2025-09). Maintained fork alternative: `pgsty/minio`. `bucket-init` reuses the MinIO image (ships `mc`) |
 | D12 | Service naming | MinIO service is `spectrana-minio` | `hub` joins shared `dokploy-network` for Postgres; a generic `minio` name could DNS-collide with another project |
-| D13 | SMTP | Required (`:?`) in prod compose | Deploy fails fast rather than silently not sending magic links |
+| D13 | SMTP | Required (`:?`) in prod compose. Brevo relay (`smtp-relay.brevo.com:587`, STARTTLS), same credentials as local `.env` | Deploy fails fast rather than silently not sending magic links |
+| D14 | Sender | `HUB_EMAIL_FROM=marginleak@majie.ai`, `HUB_EMAIL_BRAND_NAME="MarginLeak Report"` | Sender/domain must be verified in Brevo, or mail is rejected |
+| D15 | DNS | No Cloudflare proxy (DNS-only) | Client IP seen by Traefik is the real visitor |
+| D16 | First deploy branch | `develop` | Switch Dokploy to `master` after Phase 3 passes (4.3) |
 
 ## Open questions
 
-- [ ] **Q1 — Reports domain.** Is `reports.hub.majie.ai` OK, or prefer e.g. `reports.majie.ai`? Only env var `HUB_REPORTS_DOMAIN` + one Dokploy domain + DNS change.
-- [ ] **Q2 — Cloudflare.** Will `majie.ai` DNS be proxied through Cloudflare (orange cloud)? If yes, client IP becomes a Cloudflare edge IP and per-IP rate limiting degrades. Recommendation for v1: **DNS-only (grey cloud)** for both hostnames.
+- [x] **Q1 — Reports domain.** `reports.hub.majie.ai` (D5).
+- [x] **Q2 — Cloudflare.** No proxy (D15).
 - [ ] **Q3 — Managed Postgres reachability with Isolated Deployments.** Dokploy managed DBs live on `dokploy-network`, so `hub` and `migrate` join it explicitly in `docker-compose.prod.yml`. Verify on first deploy (3.1) that `migrate` connects.
-- [ ] **Q4 — SMTP provider** credentials for production magic-link email. Blocks deploy (D13).
-- [ ] **Q5 — MinIO image long-term.** Stay on frozen official quay image, move to `pgsty/minio` fork, or external S3/R2 (D11).
+- [x] **Q4 — SMTP provider.** Brevo, same as local `.env` (D13, D14). Owner to confirm `marginleak@majie.ai` is a verified Brevo sender.
+- [x] **Q5 — MinIO image.** Keep the frozen official quay image (D11). Fallback if it misbehaves: owner provides Google Cloud Storage (S3-compatible interop) — set `AWS_S3_ENDPOINT_URL=https://storage.googleapis.com` + HMAC keys and drop `spectrana-minio`/`bucket-init`.
 
 ---
 
@@ -49,12 +52,12 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] 1.6 Write `docker-compose.prod.yml`
 - [x] 1.7 `docker compose -f docker-compose.prod.yml config` validates; local Dokploy-like smoke test passed (fake `dokploy-network` + throwaway Postgres: migrate/bucket-init exit 0, hub healthz, CLI create, publish 201 to MinIO, frontend 200; torn down)
 - [x] 1.8 Add `.env.dokploy.example` (the env var list to paste into Dokploy)
-- [ ] 1.9 Commit on `develop`, push
+- [x] 1.9 Commit on `develop`, push
 
 ### Phase 2 — Dokploy setup (owner, in Dokploy UI)
 - [ ] 2.1 DNS: A records for `hub.majie.ai` and reports domain → Dokploy server IP (**before** adding domains)
 - [ ] 2.2 Create managed Postgres in the project (database or user name must contain `hub`); copy **internal** connection string, change scheme to `postgresql+asyncpg://`
-- [ ] 2.3 Create Compose app: GitHub source, branch, Compose Path `./docker-compose.prod.yml`
+- [ ] 2.3 Create Compose app: GitHub source `marwazihs/spectrana-hub`, branch **`develop`** (D16), Compose Path `./docker-compose.prod.yml`
 - [ ] 2.4 Enable Isolated Deployments
 - [ ] 2.5 Paste env vars (from `.env.dokploy.example`, with real secrets)
 - [ ] 2.6 Add domains (HTTPS on, Let's Encrypt): D3, D4 (path `/api`, strip path), D5
@@ -72,7 +75,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 ### Phase 4 — Harden & hand over
 - [ ] 4.1 Postgres backups (managed DB → S3 schedule) + test restore
 - [ ] 4.2 MinIO volume backup (Volume Backups) schedule
-- [ ] 4.3 Auto-deploy from `master`
+- [ ] 4.3 Switch Dokploy branch to `master`; enable auto-deploy
 - [ ] 4.4 Update README "Setup and Onboarding" with Dokploy notes (terminal instead of `docker compose exec`)
 - [ ] 4.5 Merge `develop` → `master`
 
@@ -83,6 +86,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 Append one line per session: date, what was done, where it stopped.
 
 - 2026-09-13 — Analysis + decisions D1–D13. Client-IP fix + tests, `docker-compose.prod.yml`, `.env.dokploy.example`, local smoke test. Next: 1.9 (commit/push), then owner answers Q1–Q5 and starts Phase 2.
+- 2026-09-13 — Owner answered Q1, Q2, Q4, Q5 (D14–D16). Pushed `develop`. Next: owner runs Phase 2 in Dokploy.
 
 ---
 
