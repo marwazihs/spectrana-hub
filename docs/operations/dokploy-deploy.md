@@ -69,7 +69,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 Live facts (2026-09-13): server `hostinger-vps` (`srv01-elgean`, 72.62.80.76, single swarm node, Dokploy v0.29.13). Compose project `majie-hub-hubmain-8fvnkj`; managed DB service `majie-hub-hubmajiedb-a4ltpm` (**postgres:18**, db `majiehubdb`). Let's Encrypt certs valid to 2026-12-12 on both hosts; HTTP→HTTPS 301 works.
 - [x] 3.1 `migrate` container exited 0 (Logs tab)
 - [x] 3.2 `https://hub.majie.ai/api/healthz` → `{"status":"ok"}`
-- [ ] 3.3 Create first customer via `hub` container terminal
+- [x] 3.3 Create first customer via `hub` container terminal — test customer **Demo Bistro** (`b7f9350d-240f-46d0-88d7-3e547ff65a66`, allowlist `marwazihs@gmail.com`)
 - [ ] 3.4 Publish a report via `https://hub.majie.ai/api/v1/reports`; returned `url` loads
 - [ ] 3.5 Magic link by email arrives; sign in; iframe renders (desktop + phone)
 - [ ] 3.6 Rate-limit sanity: `events` rows show real client IPs, not a container IP
@@ -143,10 +143,11 @@ Source: `github.com/Dokploy/website` docs (`apps/docs/content/docs/core/`), chec
 
 ## Runbook snippets
 
-**Create a customer (Dokploy → Compose app → `hub` service → Terminal):**
+**Create a customer (Dokploy → Compose app → `hub` service → Terminal, or `docker exec` on the server):**
 ```bash
-uv run python -m scripts.manage_customer create --name "Acme" --emails alice@acme.com
+python -m scripts.manage_customer create --name "Acme" --emails alice@acme.com
 ```
+Use plain `python`, **not** `uv run`: inside the prod image `uv run` syncs the dev dependency group into the container's venv at runtime (observed: "Installed 34 packages"). The venv is already on `PATH`.
 
 **Generate a secret (≥32 bytes):**
 ```bash
