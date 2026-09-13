@@ -28,6 +28,7 @@
 | D14 | Sender | `HUB_EMAIL_FROM=marginleak@majie.ai`, `HUB_EMAIL_BRAND_NAME="MarginLeak Report"` | Sender/domain must be verified in Brevo, or mail is rejected |
 | D15 | DNS | No Cloudflare proxy (DNS-only) | Client IP seen by Traefik is the real visitor |
 | D16 | First deploy branch | `develop` | Switch Dokploy to `master` after Phase 3 passes (4.3) |
+| D17 | Env injection | Named `${VAR:?}` references per service, **not** `env_file: .env` | Least privilege (MinIO/frontend don't get DB/SMTP secrets) + deploy fails on missing values. Accepted cost: secret scanners may flag `PASSWORD: ${...}` lines as false positives — mark as false positive, don't restructure |
 
 ## Open questions
 
@@ -87,6 +88,7 @@ Append one line per session: date, what was done, where it stopped.
 
 - 2026-09-13 — Analysis + decisions D1–D13. Client-IP fix + tests, `docker-compose.prod.yml`, `.env.dokploy.example`, local smoke test. Next: 1.9 (commit/push), then owner answers Q1–Q5 and starts Phase 2.
 - 2026-09-13 — Owner answered Q1, Q2, Q4, Q5 (D14–D16). Pushed `develop`. Next: owner runs Phase 2 in Dokploy.
+- 2026-09-13 — GitGuardian false positives on placeholders: blanked `.env.dokploy.example` secrets, bare `${VAR:?}` credential refs, `mc` keys via stdin (`a0c387b`). CI green. Decided D17. Next: owner runs Phase 2 in Dokploy; mark old GitGuardian incidents as false positive.
 
 ---
 
