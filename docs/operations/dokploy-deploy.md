@@ -56,22 +56,24 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] 1.9 Commit on `develop`, push
 
 ### Phase 2 — Dokploy setup (owner, in Dokploy UI)
-- [ ] 2.1 DNS: A records for `hub.majie.ai` and reports domain → Dokploy server IP (**before** adding domains)
-- [ ] 2.2 Create managed Postgres in the project (database or user name must contain `hub`); copy **internal** connection string, change scheme to `postgresql+asyncpg://`
-- [ ] 2.3 Create Compose app: GitHub source `marwazihs/spectrana-hub`, branch **`develop`** (D16), Compose Path `./docker-compose.prod.yml`
-- [ ] 2.4 Enable Isolated Deployments
-- [ ] 2.5 Paste env vars (from `.env.dokploy.example`, with real secrets)
-- [ ] 2.6 Add domains (HTTPS on, Let's Encrypt): D3, D4 (path `/api`, strip path), D5
-- [ ] 2.7 Deploy
+- [x] 2.1 DNS: A records for `hub.majie.ai` and reports domain → Dokploy server IP (**before** adding domains)
+- [x] 2.2 Create managed Postgres in the project (database or user name must contain `hub`); copy **internal** connection string, change scheme to `postgresql+asyncpg://`
+- [x] 2.3 Create Compose app: GitHub source `marwazihs/spectrana-hub`, branch **`develop`** (D16), Compose Path `./docker-compose.prod.yml`
+- [x] 2.4 Enable Isolated Deployments
+- [x] 2.5 Paste env vars (from `.env.dokploy.example`, with real secrets)
+- [x] 2.6 Add domains (HTTPS on, Let's Encrypt): D3, D4 (path `/api`, strip path), D5
+- [x] 2.7 Deploy
 
 ### Phase 3 — Verify
-- [ ] 3.1 `migrate` container exited 0 (Logs tab)
-- [ ] 3.2 `https://hub.majie.ai/api/healthz` → `{"status":"ok"}`
+
+Live facts (2026-09-13): server `hostinger-vps` (`srv01-elgean`, 72.62.80.76, single swarm node, Dokploy v0.29.13). Compose project `majie-hub-hubmain-8fvnkj`; managed DB service `majie-hub-hubmajiedb-a4ltpm` (**postgres:18**, db `majiehubdb`). Let's Encrypt certs valid to 2026-12-12 on both hosts; HTTP→HTTPS 301 works.
+- [x] 3.1 `migrate` container exited 0 (Logs tab)
+- [x] 3.2 `https://hub.majie.ai/api/healthz` → `{"status":"ok"}`
 - [ ] 3.3 Create first customer via `hub` container terminal
 - [ ] 3.4 Publish a report via `https://hub.majie.ai/api/v1/reports`; returned `url` loads
 - [ ] 3.5 Magic link by email arrives; sign in; iframe renders (desktop + phone)
 - [ ] 3.6 Rate-limit sanity: `events` rows show real client IPs, not a container IP
-- [ ] 3.7 `https://reports.<domain>/render/<id>` without token → 404; iframe works only inside viewer
+- [~] 3.7 Render guards: no token → 422, bad token → 401, `/render` via primary host → 404 ✅. Still to check: iframe works inside viewer (with 3.5)
 
 ### Phase 4 — Harden & hand over
 - [ ] 4.1 Postgres backups (managed DB → S3 schedule) + test restore
@@ -88,6 +90,7 @@ Append one line per session: date, what was done, where it stopped.
 
 - 2026-09-13 — Analysis + decisions D1–D13. Client-IP fix + tests, `docker-compose.prod.yml`, `.env.dokploy.example`, local smoke test. Next: 1.9 (commit/push), then owner answers Q1–Q5 and starts Phase 2.
 - 2026-09-13 — Owner answered Q1, Q2, Q4, Q5 (D14–D16). Pushed `develop`. Next: owner runs Phase 2 in Dokploy.
+- 2026-09-13 — First deploy failed: (1) `DATABASE_URL` scheme `postgresql://` → `No module named 'psycopg2'`; (2) managed Postgres created in UI but never deployed (no swarm service). Owner deployed DB + fixed scheme; redeploy OK: migrate/bucket-init exit 0, hub+frontend up. External checks pass (healthz, viewer 200, API 401 without key, render guards, certs). Next: 3.3–3.6.
 - 2026-09-13 — GitGuardian false positives on placeholders: blanked `.env.dokploy.example` secrets, bare `${VAR:?}` credential refs, `mc` keys via stdin (`a0c387b`). CI green. Decided D17. Next: owner runs Phase 2 in Dokploy; mark old GitGuardian incidents as false positive.
 
 ---
@@ -129,6 +132,10 @@ Source: `github.com/Dokploy/website` docs (`apps/docs/content/docs/core/`), chec
 - A failed one-shot container (e.g. `migrate`) does **not** fail the Dokploy deploy; dependents just don't start (from Dokploy source, not docs).
 
 ## Known issues outside this task
+
+- `/api/docs` (FastAPI Swagger UI) and `/api/openapi.json` are publicly reachable. Not a secret leak (routes are auth-guarded) but exposes the API surface; consider disabling docs in prod.
+- Managed DB runs **postgres:18**; code, CI, and tests use postgres:16. Migrations ran fine; watch for version-specific issues.
+- Dokploy troubleshooting: a created database does nothing until **Deploy** is clicked on the database itself.
 
 - Local `docker-compose.yml` still uses `minio/minio:latest` and `minio/mc:latest`, which can't be pulled on a fresh machine (works only where cached). Same fix as D11 when someone touches local dev.
 - Local `.env` containing `HUB_HOSTNAME` makes `Settings()` fail (`extra="forbid"`), which breaks running pytest from the repo root. Workaround: run tests from a copy without `.env`.
