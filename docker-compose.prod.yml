@@ -18,7 +18,11 @@
 #   - No `container_name`.
 #   - UI env vars land in `.env` but are NOT injected into containers, so
 #     every value is referenced explicitly as ${VAR}. `:?` fails the deploy
-#     on a missing secret instead of starting insecure.
+#     on a missing value (compose names the variable) instead of starting
+#     insecure. Credential refs stay bare `${VAR:?}` — no inline hint text —
+#     so secret scanners don't mistake them for literal passwords.
+#     Requirements: secrets/tokens >=32 bytes and distinct; MinIO password
+#     >=8 chars; DATABASE_URL uses postgresql+asyncpg://.
 #   - Named volumes persist across redeploys and support Volume Backups.
 #
 # Networks: enable "Isolated Deployments" in Dokploy. `hub` and `migrate`
@@ -27,7 +31,7 @@
 # can't collide with another project's `minio` on the shared network.
 
 x-internal-token: &internal-token
-  HUB_INTERNAL_TOKEN: ${HUB_INTERNAL_TOKEN:?set HUB_INTERNAL_TOKEN (>=32 bytes)}
+  HUB_INTERNAL_TOKEN: ${HUB_INTERNAL_TOKEN:?}
 
 x-minio-image: &minio-image
   # Docker Hub `minio/minio` and `minio/mc` are no longer pullable. Official
@@ -40,8 +44,8 @@ services:
     <<: *minio-image
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD (>=8 chars)}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
     volumes:
       - hub_minio_data:/data
     healthcheck:
@@ -52,21 +56,23 @@ services:
     restart: unless-stopped
 
   # One-shot: create the bucket if missing (idempotent). Reuses the MinIO
-  # image, which ships `mc`, so there's no second image to pull.
+  # image, which ships `mc`, so there's no second image to pull. Keys go to
+  # `mc alias set` on stdin so no credentials appear in the command line.
   bucket-init:
     <<: *minio-image
     depends_on:
       spectrana-minio:
         condition: service_healthy
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-hub-reports-prod}
     entrypoint:
       - sh
       - -c
       - |
-        mc alias set local http://spectrana-minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        printf '%s\n%s\n' "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" |
+          mc alias set local http://spectrana-minio:9000 &&
         mc mb --ignore-existing "local/$$AWS_S3_BUCKET"
     restart: "no"
 
@@ -78,7 +84,7 @@ services:
     image: spectrana-hub-api:latest
     command: ["alembic", "upgrade", "head"]
     environment:
-      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL (postgresql+asyncpg://...)}
+      DATABASE_URL: ${DATABASE_URL:?}
     networks:
       - default
       - dokploy-network
@@ -92,10 +98,10 @@ services:
     image: spectrana-hub-api:latest
     environment:
       <<: *internal-token
-      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL (postgresql+asyncpg://...)}
+      DATABASE_URL: ${DATABASE_URL:?}
       AWS_S3_ENDPOINT_URL: http://spectrana-minio:9000
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-hub-reports-prod}
       AWS_REGION: us-east-1
       # Bare hostnames, no scheme/port. The /render Host guard and CSP
@@ -105,13 +111,13 @@ services:
       HUB_URL_SCHEME: https
       HUB_EMAIL_FROM: ${HUB_EMAIL_FROM:?set HUB_EMAIL_FROM}
       HUB_EMAIL_BRAND_NAME: ${HUB_EMAIL_BRAND_NAME:?set HUB_EMAIL_BRAND_NAME}
-      HUB_SESSION_SECRET: ${HUB_SESSION_SECRET:?set HUB_SESSION_SECRET (>=32 bytes)}
-      HUB_IFRAME_JWT_SECRET: ${HUB_IFRAME_JWT_SECRET:?set HUB_IFRAME_JWT_SECRET (>=32 bytes)}
-      HUB_MAGIC_LINK_HASH_SECRET: ${HUB_MAGIC_LINK_HASH_SECRET:?set HUB_MAGIC_LINK_HASH_SECRET (>=32 bytes)}
+      HUB_SESSION_SECRET: ${HUB_SESSION_SECRET:?}
+      HUB_IFRAME_JWT_SECRET: ${HUB_IFRAME_JWT_SECRET:?}
+      HUB_MAGIC_LINK_HASH_SECRET: ${HUB_MAGIC_LINK_HASH_SECRET:?}
       SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:?set SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS:?set SMTP_PASS}
+      SMTP_USER: ${SMTP_USER:?}
+      SMTP_PASS: ${SMTP_PASS:?}
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
