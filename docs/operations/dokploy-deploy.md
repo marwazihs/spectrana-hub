@@ -79,7 +79,7 @@ Live facts (2026-09-13): server `hostinger-vps` (`srv01-elgean`, 72.62.80.76, si
 - [ ] 4.1 Postgres backups (managed DB → S3 schedule) + test restore
 - [ ] 4.2 MinIO volume backup (Volume Backups) schedule
 - [ ] 4.3 Switch Dokploy branch to `master`; enable auto-deploy
-- [ ] 4.4 Update README "Setup and Onboarding" with Dokploy notes (terminal instead of `docker compose exec`)
+- [x] 4.4 Update README "Setup and Onboarding" with Dokploy notes (terminal instead of `docker compose exec`) — plus base URLs (`$HUB_API`), prod customer CLI, "Viewing past reports", list/search/get `curl` examples (verified against prod)
 - [ ] 4.5 Merge `develop` → `master`
 
 ---

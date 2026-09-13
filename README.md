@@ -6,6 +6,17 @@ A publishing target for AI-generated reports. Agents publish HTML reports over a
 
 ## Using the Hub
 
+**Base URLs.** API paths below (`/v1/...`, `/r/.../request-link`) are relative to the API base URL. Examples use `$HUB_API`:
+
+| Environment | API base (`$HUB_API`) | Viewer (report links) |
+|---|---|---|
+| Production | `https://hub.majie.ai/api` | `https://hub.majie.ai/r/<report_id>` |
+| Local | `http://localhost:8000` | `http://localhost:3000/r/<report_id>` |
+
+```bash
+export HUB_API=https://hub.majie.ai/api   # or http://localhost:8000 locally
+```
+
 ### Setup and Onboarding
 
 #### 1. Run the stack (local)
@@ -37,15 +48,27 @@ Without a working SMTP config, email sends fail silently. Agents can still mint 
 
 For a one-shot smoke test (provisions a customer, publishes a sample report, prints a sign-in link), run `./scripts/human-test-bootstrap.sh`.
 
+**Production** runs on Dokploy from `docker-compose.prod.yml`. Setup, env vars, domains, and the deploy runbook are in [`docs/operations/dokploy-deploy.md`](docs/operations/dokploy-deploy.md).
+
 #### 2. Onboard a customer
 
-There is no admin UI in v1. Customers are provisioned with the CLI:
+There is no admin UI in v1. Customers are provisioned with the CLI, run inside the `hub` container.
+
+Local:
 
 ```bash
 docker compose exec -T hub uv run python -m scripts.manage_customer create \
   --name "Acme" \
   --emails alice@acme.com,bob@acme.com
 ```
+
+Production (Dokploy → Compose app → `hub` service → **Terminal**, or `docker exec` on the server):
+
+```bash
+python -m scripts.manage_customer create --name "Acme" --emails alice@acme.com,bob@acme.com
+```
+
+In production use plain `python`, not `uv run`: `uv run` installs dev dependencies into the running container.
 
 Output:
 
@@ -59,7 +82,7 @@ prefix:      mvk_live
 - **`--emails` is the allowlist.** Only these addresses can sign in to view the customer's reports. Addresses are stored as typed; enter them in lowercase.
 - The publishing tool needs both `customer_id` and `api_key`.
 
-Other operator commands:
+Other operator commands (same prefix as above):
 
 | Command | Purpose |
 |---|---|
@@ -117,7 +140,7 @@ BODY=$(jq -n \
     description: "Week 37", tags: ["sales","weekly"],
     generated_at: $generated_at, html: $html}')
 
-curl -sS -X POST http://localhost:8000/v1/reports \
+curl -sS -X POST "$HUB_API/v1/reports" \
   -H "Authorization: Bearer $API_KEY" \
   -H "Idempotency-Key: $(uuidgen)" \
   -H "Content-Type: application/json" \
@@ -131,7 +154,7 @@ curl -sS -X POST http://localhost:8000/v1/reports \
 ```json
 {
   "report_id": "0192…",
-  "url": "https://hub.majeve.com/r/0192…",
+  "url": "https://hub.majie.ai/r/0192…",
   "created_at": "2026-09-13T01:00:00Z"
 }
 ```
@@ -185,7 +208,7 @@ The public email form is rate-limited to 5 requests per IP per minute and 10 per
 A tool can also mint the link itself, e.g. to deliver it over Slack or chat:
 
 ```bash
-curl -sS -X POST http://localhost:8000/r/$REPORT_ID/request-link \
+curl -sS -X POST "$HUB_API/r/$REPORT_ID/request-link" \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"email": "alice@acme.com", "delivery": "return", "channel_hint": "slack"}'
@@ -211,6 +234,13 @@ Response `200`: `{ "status": "sent" | "returned", "url": "…" | null, "expires_
 | `422` | Email not on allowlist (`email-not-allowlisted`), `channel_hint` missing with `"return"`, or invalid body |
 | `429` | Over 100 requests per API key per hour; see the `Retry-After` header. Failed calls count toward the limit |
 
+#### Viewing past reports
+
+There is **no browsing page for people** in v1. Each link opens exactly one report (`/r/<report_id>`), the viewer has no list or history page, and the viewer root (`https://hub.majie.ai/`) returns `404` by design.
+
+- A signed-in person can reopen any of their customer's reports **if they have its URL** (e.g. the original email or chat message); the 30-day session covers it without a new magic link.
+- To offer a "past reports" list, build it in the calling app: list reports with the API (below) and link each row to its `url`.
+
 #### Other agent endpoints
 
 **`GET /v1/reports`**: list or search the customer's reports.
@@ -223,7 +253,21 @@ Response `200`: `{ "status": "sent" | "returned", "url": "…" | null, "expires_
 | `limit` | 1–200, default 50 |
 | `cursor` | Opaque; pass `next_cursor` from the previous page |
 
-Without `search`, results are newest `generated_at` first. Response:
+Without `search`, results are newest `generated_at` first.
+
+```bash
+# Latest reports
+curl -s "$HUB_API/v1/reports?limit=50" -H "Authorization: Bearer $API_KEY"
+
+# Search + filter (URL-encode spaces and offsets)
+curl -s "$HUB_API/v1/reports?search=credit%20card&tags=sample&from=2026-09-01T00:00:00Z" \
+  -H "Authorization: Bearer $API_KEY"
+
+# Next page
+curl -s "$HUB_API/v1/reports?limit=50&cursor=$NEXT_CURSOR" -H "Authorization: Bearer $API_KEY"
+```
+
+Response:
 
 ```json
 {
@@ -237,6 +281,10 @@ Without `search`, results are newest `generated_at` first. Response:
 ```
 
 **`GET /v1/reports/{report_id}`**: one report. Returns the list item fields plus `html`. Sends an `ETag`; repeating the request with `If-None-Match: <etag>` (exact value) returns `304`. The ETag covers metadata only, not the HTML.
+
+```bash
+curl -s "$HUB_API/v1/reports/$REPORT_ID" -H "Authorization: Bearer $API_KEY"
+```
 
 **`DELETE /v1/reports/{report_id}`**: delete a report. Returns `204`.
 
