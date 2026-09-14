@@ -4,7 +4,18 @@
 
 **Branch:** work on `develop`; merge to `master` only after the deploy passes smoke test (Dokploy auto-deploy will track `master`).
 
-**Last updated:** 2026-09-13
+**Last updated:** 2026-09-14
+
+## Status at a glance
+
+**Live in production** at `https://hub.majie.ai` (deployed from `develop`). Phases 1–2 done; Phase 3 done except the phone check; Phase 4 partly done.
+
+**Next up:**
+1. 3.5 — owner checks the report + magic-link sign-in on a phone.
+2. Q6 — owner confirms whether Dokploy auto-deploy is on for `develop` (a push redeploys prod if so).
+3. Phase 4: 4.1 Postgres backups, 4.2 MinIO volume backups, 4.3 switch Dokploy to `master`, 4.5 merge `develop` → `master`.
+4. Owner: mark the GitGuardian incidents on `d72a83d` / `2e89f1f` as false positive.
+5. Follow-ups (not blocking): see [Known issues](#known-issues-outside-this-task).
 
 ---
 
@@ -34,9 +45,10 @@
 
 - [x] **Q1 — Reports domain.** `reports.hub.majie.ai` (D5).
 - [x] **Q2 — Cloudflare.** No proxy (D15).
-- [ ] **Q3 — Managed Postgres reachability with Isolated Deployments.** Dokploy managed DBs live on `dokploy-network`, so `hub` and `migrate` join it explicitly in `docker-compose.prod.yml`. Verify on first deploy (3.1) that `migrate` connects.
-- [x] **Q4 — SMTP provider.** Brevo, same as local `.env` (D13, D14). Owner to confirm `marginleak@majie.ai` is a verified Brevo sender.
+- [x] **Q3 — Managed Postgres reachability with Isolated Deployments.** Resolved: with Isolated Deployments on, `hub` and `migrate` reach the managed DB because they join `dokploy-network` explicitly; `migrate` connected on the second deploy (3.1).
+- [x] **Q4 — SMTP provider.** Brevo, same as local `.env` (D13, D14). Sender `marginleak@majie.ai` confirmed working (magic-link email delivered 2026-09-13).
 - [x] **Q5 — MinIO image.** Keep the frozen official quay image (D11). Fallback if it misbehaves: owner provides Google Cloud Storage (S3-compatible interop) — set `AWS_S3_ENDPOINT_URL=https://storage.googleapis.com` + HMAC keys and drop `spectrana-minio`/`bucket-init`.
+- [ ] **Q6 — Auto-deploy on `develop`?** Unknown. Until confirmed, pushes to `develop` may redeploy prod; owner decides when to push.
 
 ---
 
@@ -69,7 +81,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 Live facts (2026-09-13): server `hostinger-vps` (`srv01-elgean`, 72.62.80.76, single swarm node, Dokploy v0.29.13). Compose project `majie-hub-hubmain-8fvnkj`; managed DB service `majie-hub-hubmajiedb-a4ltpm` (**postgres:18**, db `majiehubdb`). Let's Encrypt certs valid to 2026-12-12 on both hosts; HTTP→HTTPS 301 works.
 - [x] 3.1 `migrate` container exited 0 (Logs tab)
 - [x] 3.2 `https://hub.majie.ai/api/healthz` → `{"status":"ok"}`
-- [x] 3.3 Create first customer via `hub` container terminal — test customer **Demo Bistro** (`b7f9350d-240f-46d0-88d7-3e547ff65a66`, allowlist `marwazihs@gmail.com`)
+- [x] 3.3 Create first customer via `hub` container terminal — test customer **Demo Bistro** (`b7f9350d-240f-46d0-88d7-3e547ff65a66`, allowlist `marwazihs@gmail.com`, `marwazi@majie.ai`). API key handed to owner (clipboard) for the other publishing app
 - [x] 3.4 Publish a report via `https://hub.majie.ai/api/v1/reports`; returned `url` loads — sample report `01a09cc5-9068-7ad1-a071-f6164a21830a` for Demo Bistro: 201, API get/list OK, stored in MinIO, viewer URL 200
 - [~] 3.5 Magic link by email arrives; sign in; iframe renders (desktop + phone) — **desktop ✅** (email from `marginleak@majie.ai` via Brevo received, consume → session → iframe JWT → render all 200). Phone: pending
 - [x] 3.6 Rate-limit sanity: `events` rows show real client IPs, not a container IP — request came via frontend container `10.0.1.169`, but `magic_link_issued`/`magic_link_consumed` and `rate_limit_hits` recorded the owner's real public IP. **Client-IP fix verified in production**
@@ -90,9 +102,10 @@ Append one line per session: date, what was done, where it stopped.
 
 - 2026-09-13 — Analysis + decisions D1–D13. Client-IP fix + tests, `docker-compose.prod.yml`, `.env.dokploy.example`, local smoke test. Next: 1.9 (commit/push), then owner answers Q1–Q5 and starts Phase 2.
 - 2026-09-13 — Owner answered Q1, Q2, Q4, Q5 (D14–D16). Pushed `develop`. Next: owner runs Phase 2 in Dokploy.
+- 2026-09-13 — GitGuardian false positives on placeholders: blanked `.env.dokploy.example` secrets, bare `${VAR:?}` credential refs, `mc` keys via stdin (`a0c387b`). CI green. Decided D17. Next: owner runs Phase 2 in Dokploy; mark old GitGuardian incidents as false positive.
 - 2026-09-13 — First deploy failed: (1) `DATABASE_URL` scheme `postgresql://` → `No module named 'psycopg2'`; (2) managed Postgres created in UI but never deployed (no swarm service). Owner deployed DB + fixed scheme; redeploy OK: migrate/bucket-init exit 0, hub+frontend up. External checks pass (healthz, viewer 200, API 401 without key, render guards, certs). Next: 3.3–3.6.
 - 2026-09-13 — Created test customer Demo Bistro, published sample report, owner signed in on desktop via emailed magic link. Verified client-IP fix in prod DB. Next: 3.5 phone check, then Phase 4.
-- 2026-09-13 — GitGuardian false positives on placeholders: blanked `.env.dokploy.example` secrets, bare `${VAR:?}` credential refs, `mc` keys via stdin (`a0c387b`). CI green. Decided D17. Next: owner runs Phase 2 in Dokploy; mark old GitGuardian incidents as false positive.
+- 2026-09-13/14 — Added `marwazi@majie.ai` to Demo Bistro allowlist; handed API key to owner for the other app. README: base URLs (`$HUB_API`), prod customer CLI (`python -m`, not `uv run`), "Viewing past reports" (no browse page in v1; list via API), list/search/get examples verified against prod (4.4). Owner asked to hold pushes, then approved pushing `develop`. Next: see Status at a glance.
 
 ---
 
